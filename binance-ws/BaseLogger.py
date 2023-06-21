@@ -1,4 +1,5 @@
 import logging
+from logging.handlers import TimedRotatingFileHandler
 import asyncio
 
 
@@ -11,7 +12,7 @@ class BinanceAsyncLogger:
         self.logger = logging.getLogger('async_logger')
         self.logger.setLevel(logging.INFO)
 
-        handler = logging.FileHandler(log_file)
+        handler = TimedRotatingFileHandler(log_file, when='midnight', interval=1, backupCount=0)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
