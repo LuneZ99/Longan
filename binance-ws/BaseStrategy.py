@@ -14,6 +14,12 @@ from BaseHandler import SymbolStreamCsvHandler
 from BaseLogger import BinanceSyncLogger
 
 
+def convert_defaultdict_to_dict(default_dict):
+    if isinstance(default_dict, defaultdict):
+        default_dict = {k: convert_defaultdict_to_dict(v) for k, v in default_dict.items()}
+    return default_dict
+
+
 class BinanceSyncStrategy:
 
     def __init__(self, log_file="log.default", config_file=None, proxy=None, ws_trace=False, debug=False):
@@ -45,6 +51,8 @@ class BinanceSyncStrategy:
         订阅指定的symbol和channel
         """
 
+        print(f"Subscribe {symbol}@{channel}")
+
         self.subscribe_url += f"{symbol}@{channel}/"
         self.symbols.add(symbol)
 
@@ -54,7 +62,6 @@ class BinanceSyncStrategy:
         self.log_ctrl[symbol][channel] = write_to_log
         self.callbacks[symbol][channel] = self._get_callbacks(channel)
 
-        print(f"Subscribe {symbol} to {channel}, Callback function: {self._get_callbacks(channel)}")
 
     def init_handler(self, *args, **kwargs):
         raise NotImplementedError("Please register some handlers first.")
@@ -88,7 +95,7 @@ class BinanceSyncStrategy:
         )
 
         print(f"Strategy Start with subscription url: {self.subscribe_url}")
-        print(f"CallBacks: {pformat(dict(self.callbacks))}")
+        print(f"CallBacks: \n{pformat(convert_defaultdict_to_dict(self.callbacks))}")
 
         if self.proxy is None:
             ws.run_forever()
@@ -153,6 +160,7 @@ class Rec2CsvStrategy(BinanceSyncStrategy):
         self.handlers[symbol].on_agg_trade.process_line(data)
 
     def on_depth20(self, symbol: str, name: str, data: dict, rec_time: datetime):
+        # print(data)
         self.handlers[symbol].on_depth20.process_line(data)
 
     def on_force_order(self, symbol: str, name: str, data: dict, rec_time: datetime):
@@ -167,7 +175,7 @@ class Rec2CsvStrategy(BinanceSyncStrategy):
 
 
 if __name__ == '__main__':
-    s = Rec2CsvStrategy(proxy="http://i.**REMOVED**:7890", ws_trace=False)
+    s = Rec2CsvStrategy(proxy="http://i.**REMOVED**:7890", log_file="log.txt", ws_trace=False)
     s.subscribe("ethusdt", "depth20@100ms", write_to_log=True)
     s.subscribe("ethusdt", "aggTrade", write_to_log=True)
     s.init_handler("./tmp_folder")
