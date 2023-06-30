@@ -1,4 +1,5 @@
 import logging
+import queue
 from logging.handlers import TimedRotatingFileHandler
 import asyncio
 
@@ -25,6 +26,8 @@ class BinanceAsyncLogger:
     async def _write_logs(self):
         while True:
             level, message = await self.queue.get()
+            if isinstance(message, dict):
+                message = str(message)
             self.logger.log(level, message)
             self.queue.task_done()
 
@@ -38,6 +41,46 @@ class BinanceAsyncLogger:
                 pass
         self.logger.handlers[0].close()
         self.logger.removeHandler(self.logger.handlers[0])
+
+
+class BinanceSyncLogger:
+    def __init__(self, log_file):
+        self.log_file = log_file
+        self.queue = queue.Queue()
+        self.worker_task = None
+
+        self.logger = logging.getLogger('sync_logger')
+        self.logger.setLevel(logging.INFO)
+
+        handler = TimedRotatingFileHandler(log_file, when='midnight', interval=1, backupCount=0)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+
+    def log(self, level, message):
+        self.queue.put((level, message))
+        if not self.queue.empty():
+            self._write_logs()
+
+    def _write_logs(self):
+        while not self.queue.empty():
+            level, message = self.queue.get()
+            if isinstance(message, dict):
+                message = str(message)
+            self.logger.log(level, message)
+            self.queue.task_done()
+
+    def close(self):
+        if self.worker_task:
+            self.queue.join()
+            self.worker_task.cancel()
+            try:
+                self.worker_task
+            except asyncio.CancelledError:
+                pass
+        self.logger.handlers[0].close()
+        self.logger.removeHandler(self.logger.handlers[0])
+
 
 
 if __name__ == "__main__":
