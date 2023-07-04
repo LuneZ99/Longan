@@ -1,6 +1,6 @@
-import asyncio
 import json
 import os
+
 from collections import defaultdict
 from datetime import datetime
 from logging import INFO
@@ -14,10 +14,11 @@ from BaseHandler import SymbolStreamCsvHandler
 from BaseLogger import BinanceSyncLogger
 
 
-def convert_defaultdict_to_dict(default_dict):
+def format_dict(default_dict):
     if isinstance(default_dict, defaultdict):
-        default_dict = {k: convert_defaultdict_to_dict(v) for k, v in default_dict.items()}
-    return default_dict
+        return {k: format_dict(v) for k, v in default_dict.items()}
+    else:
+        return default_dict.__str__().split(' ')[2]
 
 
 class BinanceSyncStrategy:
@@ -31,7 +32,6 @@ class BinanceSyncStrategy:
 
         if proxy is not None:
             self.proxy = proxy.replace("/", "").split(':')
-            print(self.proxy)
             assert len(self.proxy) == 3, "Invalid proxy format, use format like 'http://127.0.0.1:8888'"
         else:
             self.proxy = None
@@ -62,10 +62,6 @@ class BinanceSyncStrategy:
         self.log_ctrl[symbol][channel] = write_to_log
         self.callbacks[symbol][channel] = self._get_callbacks(channel)
 
-
-    def init_handler(self, *args, **kwargs):
-        raise NotImplementedError("Please register some handlers first.")
-
     def _get_callbacks(self, channel):
 
         converted_string = ""
@@ -95,7 +91,7 @@ class BinanceSyncStrategy:
         )
 
         print(f"Strategy Start with subscription url: {self.subscribe_url}")
-        print(f"CallBacks: \n{pformat(convert_defaultdict_to_dict(self.callbacks))}")
+        print(f"CallBacks: \n{pformat(format_dict(self.callbacks))}")
 
         if self.proxy is None:
             ws.run_forever()
@@ -144,10 +140,9 @@ class BinanceSyncStrategy:
 class Rec2CsvStrategy(BinanceSyncStrategy):
     handlers: dict[str, SymbolStreamCsvHandler]
 
-    def __init__(self, log_file="log.default", config_file=None, proxy=None, ws_trace=False, debug=False):
+    def __init__(self, parent_path, log_file="log.default", config_file=None, proxy=None, ws_trace=False, debug=False):
         super().__init__(log_file, config_file, proxy, ws_trace, debug)
 
-    def init_handler(self, parent_path):
         if not os.path.exists(parent_path):
             os.makedirs(parent_path)
 
@@ -175,8 +170,7 @@ class Rec2CsvStrategy(BinanceSyncStrategy):
 
 
 if __name__ == '__main__':
-    s = Rec2CsvStrategy(proxy="http://i.**REMOVED**:7890", log_file="log.txt", ws_trace=False)
+    s = Rec2CsvStrategy(parent_path="./tmp_folder", proxy="http://i.**REMOVED**:7890", log_file="log.txt", ws_trace=False)
     s.subscribe("ethusdt", "depth20@100ms", write_to_log=True)
     s.subscribe("ethusdt", "aggTrade", write_to_log=True)
-    s.init_handler("./tmp_folder")
     s.run()
