@@ -9,9 +9,9 @@ from typing import Callable
 
 import websocket
 
-from BaseConfig import BinanceConfig
-from BaseHandler import SymbolStreamCsvHandler
-from BaseLogger import BinanceSyncLogger
+from Config import BinanceConfig
+from Handler import SymbolStreamCsvHandler
+from Logger import BinanceSyncLogger
 
 
 def format_dict(default_dict):
@@ -119,7 +119,7 @@ class BinanceSyncStrategy:
 
     @staticmethod
     def on_missing(symbol: str, name: str, data: dict, rec_time: datetime):
-        raise LookupError(f"Missing Callback on {symbol} {name}")
+        raise KeyError(f"Missing Callback on {symbol} {name}")
 
     def on_agg_trade(self, symbol: str, name: str, data: dict, rec_time: datetime):
         raise NotImplementedError

@@ -33,7 +33,7 @@ class BaseStreamCsvHandler:
         now = datetime.now()
         utc_now = now.astimezone(pytz.utc)
         utc_date = str(utc_now)[:10]
-        if self.date > utc_date:
+        if self.date < utc_date:
             self.date = utc_date
             self._reset_handle()
         line = self._process_line(info)

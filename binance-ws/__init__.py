@@ -1,1 +1,1 @@
-from .BaseConfig import StrategyConfig
+from .Config import StrategyConfig
