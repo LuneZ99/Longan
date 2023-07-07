@@ -1,7 +1,7 @@
+import asyncio
 import logging
 import queue
 from logging.handlers import TimedRotatingFileHandler
-import asyncio
 
 
 class BinanceAsyncLogger:
@@ -82,7 +82,6 @@ class BinanceSyncLogger:
         self.logger.removeHandler(self.logger.handlers[0])
 
 
-
 if __name__ == "__main__":
     # 使用示例
     async def main():
@@ -90,5 +89,6 @@ if __name__ == "__main__":
         await logger.log(logging.INFO, 'This is an async log message')
         await logger.log(logging.ERROR, 'This is another async log message')
         await logger.close()
+
 
     asyncio.run(main())
