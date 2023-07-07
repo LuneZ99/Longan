@@ -42,9 +42,9 @@ class BaseStreamCsvHandler:
         if len(line) > 0:
             self.handle.write("\n" + ",".join(map(str, line)))
 
-            self.flush_count += 1
-            if self.flush_count % 5000 == 0:
-                self.handle.flush()
+            # self.flush_count += 1
+            # if self.flush_count % 5000 == 0:
+            #     self.handle.flush()
 
     def _reset_handle(self):
 
