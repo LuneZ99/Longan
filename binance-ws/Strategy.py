@@ -117,20 +117,22 @@ class BinanceSyncStrategy:
 
     def _on_close(self, ws, code, message):
 
-        if (datetime.now() - self.connect_time).seconds > 60:
-            self.logger.log(INFO, f"Connection close. Code {code}. Message {message}")
-            self.logger.log(INFO,
-                            f"Connection reset time {self.connect_count}, "
-                            f"last run total time is {(datetime.now() - self.connect_time).seconds} seconds."
-                            )
-            print(f"Connection close. Code {code}. Message {message}")
-            print(
-                f"Connection reset time {self.connect_count}, last run total time is {(datetime.now() - self.connect_time).seconds} seconds.")
-            # self.run()
-        else:
-            self.logger.log(ERROR, f"Connection reset too quickly, stop !!!")
-            print(f"Connection reset too quickly, stop !!!")
-            sys.exit(0)
+        self.on_close(ws, code, message)
+
+        # if (datetime.now() - self.connect_time).seconds > 60:
+        #     self.logger.log(INFO, f"Connection close. Code {code}. Message {message}")
+        #     self.logger.log(INFO,
+        #                     f"Connection reset time {self.connect_count}, "
+        #                     f"last run total time is {(datetime.now() - self.connect_time).seconds} seconds."
+        #                     )
+        #     print(f"Connection close. Code {code}. Message {message}")
+        #     print(
+        #         f"Connection reset time {self.connect_count}, last run total time is {(datetime.now() - self.connect_time).seconds} seconds.")
+        #     # self.run()
+        # else:
+        #     self.logger.log(ERROR, f"Connection reset too quickly, stop !!!")
+        #     print(f"Connection reset too quickly, stop !!!")
+        #     sys.exit(0)
 
     def _on_message(self, ws, message):
 
@@ -166,6 +168,9 @@ class BinanceSyncStrategy:
     def on_book_ticker(self, symbol: str, name: str, data: dict, rec_time: int):
         raise NotImplementedError
 
+    def on_close(self, ws, code, message):
+        pass
+
 
 class Rec2CsvStrategy(BinanceSyncStrategy):
     handlers: dict[str, SymbolStreamCsvHandler]
@@ -195,6 +200,18 @@ class Rec2CsvStrategy(BinanceSyncStrategy):
 
     def on_book_ticker(self, symbol: str, name: str, data: dict, rec_time: int):
         self.handlers[symbol].on_book_ticker.process_line(data)
+
+    def on_close(self, ws, code, message):
+
+        for symbol, handler in self.handlers.values():
+
+            print(f"Saving {symbol} data...")
+
+            handler.on_agg_trade.handle.flush()
+            handler.on_depth20.handle.flush()
+            handler.on_force_order.handle.flush()
+            handler.on_kline_1m.handle.flush()
+            handler.on_book_ticker.handle.flush()
 
 
 if __name__ == '__main__':
