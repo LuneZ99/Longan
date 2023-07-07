@@ -116,13 +116,17 @@ class BinanceSyncStrategy:
         self.logger.log(INFO, "Connection started.")
 
     def _on_close(self, ws, code, message):
-        if (datetime.now() - self.connect_time).seconds > 1800:
+
+        if (datetime.now() - self.connect_time).seconds > 60:
+            self.logger.log(INFO, f"Connection close. Code {code}. Message {message}")
             self.logger.log(INFO,
                             f"Connection reset time {self.connect_count}, "
                             f"last run total time is {(datetime.now() - self.connect_time).seconds} seconds."
                             )
-            print(f"Connection reset time {self.connect_count}, last run total time is {(datetime.now() - self.connect_time).seconds} seconds.")
-            self.run()
+            print(f"Connection close. Code {code}. Message {message}")
+            print(
+                f"Connection reset time {self.connect_count}, last run total time is {(datetime.now() - self.connect_time).seconds} seconds.")
+            # self.run()
         else:
             self.logger.log(ERROR, f"Connection reset too quickly, stop !!!")
             print(f"Connection reset too quickly, stop !!!")
@@ -130,7 +134,7 @@ class BinanceSyncStrategy:
 
     def _on_message(self, ws, message):
 
-        rec_time = time.time_ns() // 1000_000
+        rec_time = time.time_ns() // 1_000_000
         message = json.loads(message)
         message['rec_time'] = rec_time
         stream_list = message['stream'].split('@')
@@ -181,7 +185,6 @@ class Rec2CsvStrategy(BinanceSyncStrategy):
         self.handlers[symbol].on_agg_trade.process_line(data)
 
     def on_depth20(self, symbol: str, name: str, data: dict, rec_time: int):
-        # print(data)
         self.handlers[symbol].on_depth20.process_line(data)
 
     def on_force_order(self, symbol: str, name: str, data: dict, rec_time: int):

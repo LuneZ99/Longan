@@ -23,22 +23,28 @@ class BaseStreamCsvHandler:
         utc_now = now.astimezone(pytz.utc)
         utc_date = str(utc_now)[:10]
         self.date = utc_date
-
+        self.flush_count = 0
 
     def on_close(self):
         if self.handle:
             self.handle.close()
 
     def process_line(self, info):
+
         now = datetime.now()
         utc_now = now.astimezone(pytz.utc)
         utc_date = str(utc_now)[:10]
         if self.date < utc_date:
             self.date = utc_date
             self._reset_handle()
+
         line = self._process_line(info)
         if len(line) > 0:
             self.handle.write("\n" + ",".join(map(str, line)))
+
+            self.flush_count += 1
+            if self.flush_count % 5000 == 0:
+                self.handle.flush()
 
     def _reset_handle(self):
 
@@ -62,6 +68,7 @@ class BaseStreamCsvHandler:
 
     def _write_csv_header(self):
         self.handle.write(self.headers)
+        self.handle.flush()
 
     def _process_line(self, info):
         raise NotImplementedError
@@ -92,6 +99,7 @@ class KlineHandler(BaseStreamCsvHandler):
     def __init__(self, path, symbol, stream):
         assert "kline" in stream, "This handler is only supported for kline streams"
         super().__init__(path, symbol, stream)
+        # print("xxxx")
         self.headers = "OrigTime,TimeStart,TimeEnd,TradeFirst,TradeLast,Open,Close,High,Low,Volume,TradeCount,Money,BuyVolume,BuyMoney"
         self._reset_handle()
 
@@ -183,5 +191,3 @@ class SymbolStreamCsvHandler:
         self.on_book_ticker = BookTickerHandler(path, symbol)
         self.on_force_order = ForceOrderHandler(path, symbol)
         self.on_depth20 = Depth20Handler(path, symbol)
-
-
