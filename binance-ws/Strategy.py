@@ -1,9 +1,10 @@
 import json
 import os
-
+import sys
+import time
 from collections import defaultdict
 from datetime import datetime
-from logging import INFO
+from logging import INFO, ERROR
 from pprint import pformat
 from typing import Callable
 
@@ -44,6 +45,9 @@ class BinanceSyncStrategy:
         self.subscribe_url = "wss://fstream.binance.com/stream?streams="
         websocket.enableTrace(ws_trace)
         self.debug = debug
+
+        self.connect_time = None
+        self.connect_count = 0
 
     def subscribe(self, symbol: str, channel: str, write_to_log: bool = True):
 
@@ -88,6 +92,8 @@ class BinanceSyncStrategy:
         ws = websocket.WebSocketApp(
             self.subscribe_url,
             on_message=self._on_message,
+            on_open=self._on_open,
+            on_close=self._on_close
         )
 
         print(f"Strategy Start with subscription url: {self.subscribe_url}")
@@ -103,10 +109,30 @@ class BinanceSyncStrategy:
                 proxy_type=self.proxy[0]
             )
 
+    def _on_open(self, ws):
+        self.connect_time = datetime.now()
+        self.connect_count += 1
+        print("Connection started.")
+        self.logger.log(INFO, "Connection started.")
+
+    def _on_close(self, ws, code, message):
+        if (datetime.now() - self.connect_time).seconds > 1800:
+            self.logger.log(INFO,
+                            f"Connection reset time {self.connect_count}, "
+                            f"last run total time is {(datetime.now() - self.connect_time).seconds} seconds."
+                            )
+            print(f"Connection reset time {self.connect_count}, last run total time is {(datetime.now() - self.connect_time).seconds} seconds.")
+            self.run()
+        else:
+            self.logger.log(ERROR, f"Connection reset too quickly, stop !!!")
+            print(f"Connection reset too quickly, stop !!!")
+            sys.exit(0)
+
     def _on_message(self, ws, message):
 
-        rec_time = datetime.now()
+        rec_time = time.time_ns() // 1000_000
         message = json.loads(message)
+        message['rec_time'] = rec_time
         stream_list = message['stream'].split('@')
         symbol = stream_list[0]
         event = stream_list[1]
@@ -118,22 +144,22 @@ class BinanceSyncStrategy:
         self.callbacks[symbol][event](symbol, event, data, rec_time)
 
     @staticmethod
-    def on_missing(symbol: str, name: str, data: dict, rec_time: datetime):
+    def on_missing(symbol: str, name: str, data: dict, rec_time: int):
         raise KeyError(f"Missing Callback on {symbol} {name}")
 
-    def on_agg_trade(self, symbol: str, name: str, data: dict, rec_time: datetime):
+    def on_agg_trade(self, symbol: str, name: str, data: dict, rec_time: int):
         raise NotImplementedError
 
-    def on_depth20(self, symbol: str, name: str, data: dict, rec_time: datetime):
+    def on_depth20(self, symbol: str, name: str, data: dict, rec_time: int):
         raise NotImplementedError
 
-    def on_force_order(self, symbol: str, name: str, data: dict, rec_time: datetime):
+    def on_force_order(self, symbol: str, name: str, data: dict, rec_time: int):
         raise NotImplementedError
 
-    def on_kline(self, symbol: str, name: str, data: dict, rec_time: datetime):
+    def on_kline_1m(self, symbol: str, name: str, data: dict, rec_time: int):
         raise NotImplementedError
 
-    def on_book_ticker(self, symbol: str, name: str, data: dict, rec_time: datetime):
+    def on_book_ticker(self, symbol: str, name: str, data: dict, rec_time: int):
         raise NotImplementedError
 
 
@@ -151,26 +177,37 @@ class Rec2CsvStrategy(BinanceSyncStrategy):
             for symbol in ["ethusdt", "btcusdt"]
         }
 
-    def on_agg_trade(self, symbol: str, name: str, data: dict, rec_time: datetime):
+    def on_agg_trade(self, symbol: str, name: str, data: dict, rec_time: int):
         self.handlers[symbol].on_agg_trade.process_line(data)
 
-    def on_depth20(self, symbol: str, name: str, data: dict, rec_time: datetime):
+    def on_depth20(self, symbol: str, name: str, data: dict, rec_time: int):
         # print(data)
         self.handlers[symbol].on_depth20.process_line(data)
 
-    def on_force_order(self, symbol: str, name: str, data: dict, rec_time: datetime):
+    def on_force_order(self, symbol: str, name: str, data: dict, rec_time: int):
         self.handlers[symbol].on_force_order.process_line(data)
 
-    def on_kline(self, symbol: str, name: str, data: dict, rec_time: datetime):
-        pass
-        # self.handlers[symbol].on_kline.process_line(data)
+    def on_kline_1m(self, symbol: str, name: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_kline_1m.process_line(data)
 
-    def on_book_ticker(self, symbol: str, name: str, data: dict, rec_time: datetime):
+    def on_book_ticker(self, symbol: str, name: str, data: dict, rec_time: int):
         self.handlers[symbol].on_book_ticker.process_line(data)
 
 
 if __name__ == '__main__':
-    s = Rec2CsvStrategy(parent_path="./tmp_folder", proxy="http://i.**REMOVED**:7890", log_file="log.txt", ws_trace=False)
-    s.subscribe("ethusdt", "depth20@100ms", write_to_log=True)
+    s = Rec2CsvStrategy(parent_path="./raw_folder", proxy="http://i.**REMOVED**:7890", log_file="log.txt",
+                        ws_trace=False)
+
     s.subscribe("ethusdt", "aggTrade", write_to_log=True)
+    s.subscribe("ethusdt", "kline_1m", write_to_log=True)
+    s.subscribe("ethusdt", "depth20@100ms", write_to_log=True)
+    s.subscribe("ethusdt", "forceOrder", write_to_log=True)
+    s.subscribe("ethusdt", "bookTicker", write_to_log=True)
+
+    s.subscribe("btcusdt", "aggTrade", write_to_log=True)
+    s.subscribe("btcusdt", "kline_1m", write_to_log=True)
+    s.subscribe("btcusdt", "depth20@100ms", write_to_log=True)
+    s.subscribe("btcusdt", "forceOrder", write_to_log=True)
+    s.subscribe("btcusdt", "bookTicker", write_to_log=True)
+
     s.run()

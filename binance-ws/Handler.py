@@ -179,7 +179,7 @@ class SymbolStreamCsvHandler:
 
     def __init__(self, path, symbol):
         self.on_agg_trade = AggTradeHandler(path, symbol)
-        # self.on_kline = KlineHandler(path, symbol)
+        self.on_kline_1m = KlineHandler(path, symbol, 'kline_1m')
         self.on_book_ticker = BookTickerHandler(path, symbol)
         self.on_force_order = ForceOrderHandler(path, symbol)
         self.on_depth20 = Depth20Handler(path, symbol)
