@@ -205,7 +205,7 @@ class Rec2CsvStrategy(BinanceSyncStrategy):
 
         for symbol, handler in self.handlers.values():
 
-            print(f"Saving {symbol} data...")
+            print(f"Flushing {symbol} data...")
 
             handler.on_agg_trade.handle.flush()
             handler.on_depth20.handle.flush()
