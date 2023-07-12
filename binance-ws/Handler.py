@@ -41,7 +41,7 @@ class BaseStreamCsvHandler:
         line = self._process_line(info)
         if len(line) > 0:
             self.handle.write("\n" + ",".join(map(str, line)))
-
+            self.handle.flush()
             # self.flush_count += 1
             # if self.flush_count % 5000 == 0:
             #     self.handle.flush()
@@ -57,7 +57,7 @@ class BaseStreamCsvHandler:
             os.makedirs(f"{self.parent_path}/{self.symbol}/{self.date}")
 
         if os.path.exists(self.file_name):
-            if os.path.getsize(self.file_name) <= 128:
+            if os.path.getsize(self.file_name) <= 1024:
                 self.handle = open(self.file_name, "w")
                 self._write_csv_header()
             else:
