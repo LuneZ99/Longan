@@ -47,8 +47,15 @@ class Rec2CsvStrategy(BinanceSyncStrategy):
 
 
 if __name__ == '__main__':
-    s = Rec2CsvStrategy(parent_path="./raw_folder", proxy="http://i.**REMOVED**:7890", log_file="./log.txt",
-                        ws_trace=False)
+    s = Rec2CsvStrategy(
+        parent_path="./raw_folder",
+        proxy=[
+            "http://i.**REMOVED**:7890",
+            "http://127.0.0.1:7890",
+        ],
+        log_file="./log.txt",
+        ws_trace=False
+    )
 
     s.subscribe("ethusdt", "aggTrade", write_to_log=True)
     s.subscribe("ethusdt", "kline_1m", write_to_log=True)

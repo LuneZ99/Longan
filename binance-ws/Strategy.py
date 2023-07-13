@@ -11,10 +11,8 @@ from pprint import pformat
 from typing import Callable
 
 import websocket
-import atexit
 
 from Config import BinanceConfig
-from Handler import SymbolStreamCsvHandler
 from Logger import BinanceSyncLogger
 
 
