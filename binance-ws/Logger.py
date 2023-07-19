@@ -85,7 +85,7 @@ class BinanceSyncLogger:
 if __name__ == "__main__":
     # 使用示例
     async def main():
-        logger = BinanceAsyncLogger('log.txt')
+        logger = BinanceAsyncLogger('raw_folder/log.txt')
         await logger.log(logging.INFO, 'This is an async log message')
         await logger.log(logging.ERROR, 'This is another async log message')
         await logger.close()
