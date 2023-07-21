@@ -5,8 +5,6 @@ RUN sed -i 's#http://deb.debian.org#https://mirrors.ustc.edu.cn#g' /etc/apt/sour
 
 RUN apt-get update && apt-get install -y gcc g++
 
-RUN echo -e "[ProxyList]\nhttp 127.0.0.1 7890" >> /etc/proxychains.conf
-
 WORKDIR /app
 
 COPY . /app
