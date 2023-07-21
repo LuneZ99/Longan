@@ -33,7 +33,10 @@ def process_folder(raw_folder, log_file='log.txt'):
         x.split('.')[-1] for x in os.listdir(raw_folder)
         if "txt" in x and not x.endswith("txt") and not x.endswith('gz')
     ]
-    print(f'processing {need_to_process_days}')
+    if len(need_to_process_days) > 0:
+        print(f'Processing {need_to_process_days}')
+    else:
+        print(f'No data need to be process.')
 
     for day in need_to_process_days:
 
@@ -49,4 +52,15 @@ def process_folder(raw_folder, log_file='log.txt'):
 
 
 if __name__ == '__main__':
-    process_folder('../raw_folder')
+
+    import argparse
+
+    # 创建 ArgumentParser 对象
+    parser = argparse.ArgumentParser(description="RawProcessor Command Line Interface")
+
+    # 添加命令行参数
+    parser.add_argument("--raw_folder", type=str, help="Raw data folder")
+
+    # 解析命令行参数
+    args = parser.parse_args()
+    process_folder(args.raw_folder)

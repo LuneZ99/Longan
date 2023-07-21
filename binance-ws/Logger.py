@@ -52,10 +52,15 @@ class BinanceSyncLogger:
         self.logger = logging.getLogger('sync_logger')
         self.logger.setLevel(logging.INFO)
 
-        handler = TimedRotatingFileHandler(log_file, when='midnight', interval=1, backupCount=0)
+        file_handler = TimedRotatingFileHandler(log_file, when='midnight', interval=1, backupCount=0)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+        file_handler.setFormatter(formatter)
+
+        console_handler = logging.StreamHandler()  # Add a console handler for printing to console
+        console_handler.setFormatter(formatter)
+
+        self.logger.addHandler(file_handler)
+        self.logger.addHandler(console_handler)  # Add the console handler to the logger
 
     def log(self, level, message):
         self.queue.put((level, message))
@@ -68,6 +73,7 @@ class BinanceSyncLogger:
             if isinstance(message, dict):
                 message = str(message)
             self.logger.log(level, message)
+            # print(message)  # Print the message to the console
             self.queue.task_done()
 
     def close(self):
@@ -78,17 +84,15 @@ class BinanceSyncLogger:
                 self.worker_task
             except asyncio.CancelledError:
                 pass
-        self.logger.handlers[0].close()
-        self.logger.removeHandler(self.logger.handlers[0])
+        for handler in self.logger.handlers:  # Close all handlers
+            handler.close()
+            self.logger.removeHandler(handler)
 
 
 if __name__ == "__main__":
     # 使用示例
-    async def main():
-        logger = BinanceAsyncLogger('raw_folder/log.txt')
-        await logger.log(logging.INFO, 'This is an async log message')
-        await logger.log(logging.ERROR, 'This is another async log message')
-        await logger.close()
+    logger = BinanceSyncLogger('log.txt')
+    logger.log(logging.INFO, 'This is an async log message')
+    logger.log(logging.ERROR, 'This is another async log message')
+    logger.close()
 
-
-    asyncio.run(main())

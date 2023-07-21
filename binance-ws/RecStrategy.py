@@ -93,9 +93,14 @@ if __name__ == '__main__':
     parser.add_argument("--subscriptions", type=str, nargs="+",
                         default=["aggTrade", "kline_1m", "depth20@100ms", "forceOrder", "bookTicker"],
                         help="List of subscription strings")
+    parser.add_argument("--docker", action="store_true", help="Is running in docker")
 
     # 解析命令行参数
     args = parser.parse_args()
+
+    if args.docker:
+        import sys
+        sys.stdout = sys.stderr = open('/dev/stdout', 'w')
 
     s = Rec2CsvStrategy(
         symbols=args.symbols,
