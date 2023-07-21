@@ -105,29 +105,26 @@ class BinanceSyncStrategy:
             on_close=self._on_close
         )
 
-        print(f"Strategy Start with subscription url: {self.subscribe_url}")
-        print(f"CallBacks: \n{pformat(format_dict(self.callbacks))}")
+        self.logger.log(INFO, f"Strategy Start with subscription url: {self.subscribe_url}")
+        self.logger.log(INFO, f"CallBacks: \n{pformat(format_dict(self.callbacks))}")
 
         if self.proxy is None:
             while True:
                 ws.run_forever()
-                print(f"Websocket disconnected, retrying ...")
                 self.logger.log(ERROR, f"Websocket disconnected, retrying ...")
         else:
             for proxy in itertools.cycle(self.proxy):
-                print(f"Using proxy: {proxy}")
+                self.logger.log(INFO, f"Using proxy: {proxy}")
                 ws.run_forever(
                     http_proxy_host=proxy[1],
                     http_proxy_port=proxy[2],
                     proxy_type=proxy[0]
                 )
-                print(f"Websocket disconnected, retrying ...")
                 self.logger.log(ERROR, f"Websocket disconnected, retrying ...")
 
     def _on_open(self, ws):
         self.connect_time = datetime.now()
         self.connect_count += 1
-        print("Connection started.")
         self.logger.log(INFO, "Connection started.")
 
     def _on_close(self, ws, code, message):
@@ -135,18 +132,12 @@ class BinanceSyncStrategy:
         self.on_close(ws, code, message)
 
         if (datetime.now() - self.connect_time).seconds > 60:
-            self.logger.log(INFO, f"Connection close. Code {code}. Message {message}")
-            self.logger.log(INFO,
-                            f"Connection reset time {self.connect_count}, "
-                            f"last run total time is {(datetime.now() - self.connect_time).seconds} seconds."
-                            )
-            print(f"Connection close. Code {code}. Message {message}")
-            print(
-                f"Connection reset time {self.connect_count}, last run total time is {(datetime.now() - self.connect_time).seconds} seconds.")
+
+            self.logger.log(ERROR, f"Connection close. Code {code}. Message {message}")
+            self.logger.log(ERROR, f"Connection reset time {self.connect_count}, last run total time is {(datetime.now() - self.connect_time).seconds} seconds.")
             # self.run()
         else:
             self.logger.log(ERROR, f"Connection reset too quickly, stop !!!")
-            print(f"Connection reset too quickly, stop !!!")
             sys.exit(0)
 
     def _on_message(self, ws, message):
