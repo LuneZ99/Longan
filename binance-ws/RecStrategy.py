@@ -93,7 +93,7 @@ if __name__ == '__main__':
     parser.add_argument("--subscriptions", type=str, nargs="+",
                         default=["aggTrade", "kline_1m", "depth20@100ms", "forceOrder", "bookTicker"],
                         help="List of subscription strings")
-    parser.add_argument("--write_to_log", action="store_true", help="Write to log file")
+    parser.add_argument("--log_interval", type=int, default=0, help="Interval Write to log file")
 
     # 解析命令行参数
     args = parser.parse_args()
@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
     for _symbol in args.symbols:
         for subscription in args.subscriptions:
-            s.subscribe(_symbol, subscription, write_to_log=args.write_to_log)
+            s.subscribe(_symbol, subscription, log_interval=args.log_interval)
 
     s.run()
 

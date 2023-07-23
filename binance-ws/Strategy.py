@@ -49,7 +49,8 @@ class BinanceSyncStrategy:
         self.symbols = set()
         self.handlers = dict()
         self.callbacks: dict[str, dict[str, Callable]] = defaultdict(lambda: defaultdict(lambda: self.on_missing))
-        self.log_ctrl: dict[str, dict[str, bool]] = defaultdict(lambda: defaultdict(lambda: False))
+        self.log_interval: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
+        self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
 
         self.subscribe_url = "wss://fstream.binance.com/stream?streams="
         websocket.enableTrace(ws_trace)
@@ -58,7 +59,7 @@ class BinanceSyncStrategy:
         self.connect_time = None
         self.connect_count = 0
 
-    def subscribe(self, symbol: str, channel: str, write_to_log: bool = True):
+    def subscribe(self, symbol: str, channel: str, log_interval: int = True):
 
         """
         订阅指定的symbol和channel
@@ -72,7 +73,8 @@ class BinanceSyncStrategy:
         if "@" in channel:
             channel = channel.split("@")[0]
 
-        self.log_ctrl[symbol][channel] = write_to_log
+        self.log_interval[symbol][channel] = log_interval
+        self.log_count[symbol][channel] = 0
         self.callbacks[symbol][channel] = self._get_callbacks(channel)
 
     def _get_callbacks(self, channel):
@@ -152,7 +154,8 @@ class BinanceSyncStrategy:
         event = stream_list[1]
         data: dict = message['data']
 
-        if self.log_ctrl[symbol][event]:
+        if self.log_interval[symbol][event] > 0 and self.log_count[symbol][event] % self.log_interval[symbol][event] == 0:
+            self.log_count[symbol][event] += 1
             self.logger.log(INFO, message)
 
         self.callbacks[symbol][event](symbol, event, data, rec_time)
