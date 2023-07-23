@@ -155,10 +155,10 @@ class BinanceSyncStrategy:
         data: dict = message['data']
 
         if self.log_interval[symbol][event] > 0 and self.log_count[symbol][event] % self.log_interval[symbol][event] == 0:
-            self.log_count[symbol][event] += 1
             self.logger.log(INFO, message)
 
         self.callbacks[symbol][event](symbol, event, data, rec_time)
+        self.log_count[symbol][event] += 1
 
     @staticmethod
     def on_missing(symbol: str, name: str, data: dict, rec_time: int):

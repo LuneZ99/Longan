@@ -67,11 +67,11 @@ if __name__ == '__main__':
     # )
     #
     # for _symbol in symbols_all:
-    #     s.subscribe(_symbol, "aggTrade", write_to_log=True)
-    #     s.subscribe(_symbol, "kline_1m", write_to_log=True)
-    #     s.subscribe(_symbol, "depth20@100ms", write_to_log=True)
-    #     s.subscribe(_symbol, "forceOrder", write_to_log=True)
-    #     s.subscribe(_symbol, "bookTicker", write_to_log=True)
+    #     s.subscribe(_symbol, "aggTrade", log_interval=100)
+    #     s.subscribe(_symbol, "kline_1m", log_interval=100)
+    #     s.subscribe(_symbol, "depth20@100ms", log_interval=100)
+    #     s.subscribe(_symbol, "forceOrder", log_interval=100)
+    #     s.subscribe(_symbol, "bookTicker", log_interval=100)
     #
     # s.run()
 
