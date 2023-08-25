@@ -3,7 +3,7 @@ version: '3'
 services:
   binance-rec-strategy:
     build:
-      context: .
+      context: ""
       dockerfile: Dockerfile
     container_name: binance-rec-strategy
     volumes:
