@@ -1,77 +1,60 @@
-import os
-from datetime import datetime
-from typing import Optional, IO
+from peewee import *
 
-import pytz
+# 设置 MySQL 数据库连接
+db = MySQLDatabase(
+    'binance',
+    user='root',
+    password='**REMOVED**',
+    host='**REMOVED**',
+    port=10003
+)
 
 
-class BaseStreamCsvHandler:
-    date: str
-    symbol: str
-    event: str
-    handle: Optional[IO]
-    headers: str
-    file_name: str
+class Kline1m(Model):
+    id = AutoField(primary_key=True)
 
-    def __init__(self, path, symbol, event):
-        self.parent_path = path
-        self.symbol = symbol
-        self.event = event
-        self.handle = None
+    symbol = CharField()
+    rec_time = IntegerField()
 
-        now = datetime.now()
-        utc_now = now.astimezone(pytz.utc)
-        utc_date = str(utc_now)[:10]
-        self.date = utc_date
-        self.flush_count = 0
+    open_time = IntegerField()
+    close_time = IntegerField()
 
-    def on_close(self):
-        if self.handle:
-            self.handle.close()
+    open = FloatField()
+    high = FloatField()
+    low = FloatField()
+    close = FloatField()
+    volume = FloatField()
+    quote_volume = FloatField()
+    count = IntegerField()
+    taker_buy_volume = FloatField()
+    taker_buy_quote_volume = FloatField()
 
-    def process_line(self, info):
+    class Meta:
+        database = db
 
-        now = datetime.now()
-        utc_now = now.astimezone(pytz.utc)
-        utc_date = str(utc_now)[:10]
-        if self.date < utc_date:
-            self.date = utc_date
-            self._reset_handle()
 
-        line = self._process_line(info)
-        if len(line) > 0:
-            self.handle.write("\n" + ",".join(map(str, line)))
-            self.handle.flush()
-            # self.flush_count += 1
-            # if self.flush_count % 5000 == 0:
-            #     self.handle.flush()
+class Kline8h(Model):
+    id = AutoField(primary_key=True)
 
-    def _reset_handle(self):
+    symbol = CharField()
+    rec_time = IntegerField()
 
-        if self.handle:
-            self.handle.close()
+    open_time = IntegerField()
+    close_time = IntegerField()
 
-        self.file_name = f"{self.parent_path}/{self.symbol}/{self.date}/{self.event}.csv"
+    open = FloatField()
+    high = FloatField()
+    low = FloatField()
+    close = FloatField()
+    volume = FloatField()
+    quote_volume = FloatField()
+    count = IntegerField()
+    taker_buy_volume = FloatField()
+    taker_buy_quote_volume = FloatField()
 
-        if not os.path.exists(f"{self.parent_path}/{self.symbol}/{self.date}"):
-            os.makedirs(f"{self.parent_path}/{self.symbol}/{self.date}")
+    class Meta:
+        database = db
 
-        if os.path.exists(self.file_name):
-            if os.path.getsize(self.file_name) <= 1024:
-                self.handle = open(self.file_name, "w")
-                self._write_csv_header()
-            else:
-                self.handle = open(self.file_name, "a")
-        else:
-            self.handle = open(self.file_name, "w")
-            self._write_csv_header()
-
-    def _write_csv_header(self):
-        self.handle.write(self.headers)
-        self.handle.flush()
-
-    def _process_line(self, info):
-        raise NotImplementedError
 
 
 class AggTradeHandler(BaseStreamCsvHandler):

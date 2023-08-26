@@ -1,4 +1,7 @@
 pyyaml~=6.0
 pydantic~=1.10.6
 pytz~=2022.7
-pandas
+pandas~=2.0.3
+peewee~=3.16.3
+six~=1.16.0
+websocket-client~=1.6.2

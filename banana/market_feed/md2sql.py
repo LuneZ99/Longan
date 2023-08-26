@@ -1,63 +1,50 @@
-import asyncio
-import websockets
+import os
 
+from base_ws_client import BinanceWSClientMD
 
-async def handle_message(message):
-    print("Received message:", message)
-    # 在这里执行您想要的操作
+class Rec2CsvStrategy(BinanceWSClientMD):
+    handlers: dict[str, SymbolStreamCsvHandler]
 
+    def __init__(self, parent_path, log_file=None, symbols=None, config_file=None, proxy=None, ws_trace=False, debug=False):
 
-async def send_pong_periodically(websocket):
-    while True:
-        await asyncio.sleep(600)  # 等待十分钟
-        await websocket.ping()
+        if log_file is None:
+            log_file = os.path.join(parent_path, "log.txt")
 
+        super().__init__(log_file, config_file, proxy, ws_trace, debug)
 
+        if symbols is None:
+            symbols = ["ethusdt", "btcusdt"]
+        if not os.path.exists(parent_path):
+            os.makedirs(parent_path)
 
-async def subscribe_to_websocket(uri):
-    try:
-        async with websockets.connect(uri) as websocket:
-            print("Connected to", uri)
+        self.handlers: dict[str, SymbolStreamCsvHandler] = {
+            symbol: SymbolStreamCsvHandler(parent_path, symbol)
+            for symbol in symbols
+        }
 
-            # 发送ping帧以保持连接
-            await websocket.ping()
+    def on_agg_trade(self, symbol: str, name: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_agg_trade.process_line(data)
 
-            # 启动定时器，定时发送pong帧
-            asyncio.create_task(send_pong_periodically(websocket))
+    def on_depth20(self, symbol: str, name: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_depth20.process_line(data)
 
-            # 进入消息接收循环
-            while True:
-                message = await websocket.recv()
-                await handle_message(message)
+    def on_force_order(self, symbol: str, name: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_force_order.process_line(data)
 
-    except websockets.ConnectionClosed:
-        print("Connection closed for", uri)
-        # 处理连接关闭的逻辑，例如尝试重新连接等待一段时间
+    def on_kline_1m(self, symbol: str, name: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_kline_1m.process_line(data)
 
-        # 暂停一段时间后尝试重新连接
-        await asyncio.sleep(5)
+    def on_book_ticker(self, symbol: str, name: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_book_ticker.process_line(data)
 
+    def on_close(self, ws, code, message):
 
+        for sym, handler in self.handlers.values():
 
-async def subscribe_to_websockets(uris):
-    tasks = []
+            print(f"Flushing {sym} data...")
 
-    for uri in uris:
-        tasks.append(asyncio.create_task(subscribe_to_websocket(uri)))
-
-    await asyncio.gather(*tasks)
-
-
-
-if __name__ == '__main__':
-
-
-    # 要订阅的WebSocket链接列表
-    uri_lst = [
-        "wss://example.com/websocket1",
-        "wss://example.com/websocket2",
-        "wss://example.com/websocket3"
-    ]
-
-    # 运行订阅逻辑
-    asyncio.get_event_loop().run_until_complete(subscribe_to_websockets(uri_lst))
+            handler.on_agg_trade.handle.flush()
+            handler.on_depth20.handle.flush()
+            handler.on_force_order.handle.flush()
+            handler.on_kline_1m.handle.flush()
+            handler.on_book_ticker.handle.flush()

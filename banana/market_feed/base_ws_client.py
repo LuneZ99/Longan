@@ -1,9 +1,7 @@
+import itertools
 import json
-import os
 import sys
 import time
-import itertools
-
 from collections import defaultdict
 from datetime import datetime
 from logging import INFO, ERROR
@@ -11,9 +9,20 @@ from pprint import pformat
 from typing import Callable
 
 import websocket
+import yaml
+from pydantic import BaseSettings
 
-from Config import BinanceConfig
 from Logger import BinanceSyncLogger
+
+
+class BinanceConfig(BaseSettings):
+    strategy_name: str = ""
+
+    @classmethod
+    def load_from_yaml(cls, file_path: str):
+        with open(file_path, 'r') as f:
+            yaml_data = yaml.safe_load(f)
+        return cls(**yaml_data)
 
 
 def format_dict(default_dict):
@@ -23,7 +32,7 @@ def format_dict(default_dict):
         return default_dict.__str__().split(' ')[2]
 
 
-class BinanceSyncStrategy:
+class BinanceWSClientMD:
 
     def __init__(self, log_file="log.default", config_file=None, proxy=None, ws_trace=False, debug=False):
 
@@ -123,6 +132,7 @@ class BinanceSyncStrategy:
                     proxy_type=proxy[0]
                 )
                 self.logger.log(ERROR, f"Websocket disconnected, retrying ...")
+                time.sleep(5)
 
     def _on_open(self, ws):
         self.connect_time = datetime.now()
