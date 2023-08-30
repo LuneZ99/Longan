@@ -60,9 +60,14 @@ class BaseBinanceWSClient:
         self.connect_time = None
         self.connect_count = 0
 
+        self.delay_warning_threshold = 500
         self.delay_warning_last = 0
         self.delay_warning_interval = 30
         self.delay_warning_count = 0
+
+
+    def log(self, level, msg):
+        self.logger.log(level, f"MD-{self.name}: {msg}")
 
     def subscribe(self, symbol: str, channel: str, log_interval: int = True):
 
@@ -70,8 +75,7 @@ class BaseBinanceWSClient:
         订阅指定的symbol和channel
         """
 
-        self.logger.log(INFO, f"Subscribe {symbol}@{channel}")
-
+        self.log(INFO, f"Subscribe {symbol}@{channel}")
         self.subscribe_url += f"{symbol}@{channel}/"
         self.symbols.add(symbol)
 
@@ -84,7 +88,7 @@ class BaseBinanceWSClient:
 
         self.subscribe_count += 1
         if self.subscribe_count >= 200:
-            self.logger.log(ERROR, f"Subscribed {symbol} failed because {self.subscribe_count} is larger than 200")
+            self.log(ERROR, f"Subscribed {symbol} failed because {self.subscribe_count} is larger than 200")
             raise ValueError(f"Subscribed {symbol} failed because {self.subscribe_count} is larger than 200")
 
     def _get_callbacks(self, channel):
@@ -117,34 +121,34 @@ class BaseBinanceWSClient:
             on_close=self._on_close
         )
 
-        self.logger.log(INFO, f"Strategy Start with subscription url: {self.subscribe_url[:-1]}")
-        self.logger.log(INFO, f"CallBacks: \n{pformat(format_dict(self.callbacks))}")
-        self.logger.log(INFO, f"Total subscribe num: {self.subscribe_count}")
+        self.log(INFO, f"Strategy Start with subscription url: {self.subscribe_url[:-1]}")
+        self.log(INFO, f"CallBacks: \n{pformat(format_dict(self.callbacks))}")
+        self.log(INFO, f"Total subscribe num: {self.subscribe_count}")
 
         if self.proxy is None:
             while True:
                 ws.run_forever()
-                self.logger.log(ERROR, f"Websocket disconnected, retrying ...")
+                self.log(ERROR, f"Websocket disconnected, retrying ...")
         else:
             for proxy in itertools.cycle(self.proxy):
-                self.logger.log(INFO, f"Using proxy: {proxy}")
+                self.log(INFO, f"Using proxy: {proxy}")
                 ws.run_forever(
                     http_proxy_host=proxy[1],
                     http_proxy_port=proxy[2],
                     proxy_type=proxy[0]
                 )
                 ws.close()
-                self.logger.log(ERROR, f"Websocket disconnected, retrying ...")
+                self.log(ERROR, f"Websocket disconnected, retrying ...")
                 self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
-                time.sleep(5)
+                time.sleep(10)
 
     def _on_open(self, ws):
         self.connect_time = datetime.now()
         self.connect_count += 1
-        self.logger.log(INFO, f"MD {self.name} Connection started.")
+        self.log(INFO, f"Connection started.")
 
     def _on_close(self, ws, code, message):
-        self.logger.log(WARN, "Websocket Connection closing ...")
+        self.log(WARN, "Websocket Connection closing ...")
         for handler in self.handlers.values():
             handler.on_close()
 
@@ -163,13 +167,13 @@ class BaseBinanceWSClient:
 
         if self.log_interval[symbol][event] > 0 and \
                 self.log_count[symbol][event] % self.log_interval[symbol][event] == 0:
-            self.logger.log(INFO, message)
+            self.log(INFO, message)
 
-        if message['delay'] > 300:
+        if message['delay'] > self.delay_warning_threshold:
             self.delay_warning_count += 1
 
-        if message['delay'] > 300 and time.time() - self.delay_warning_last > self.delay_warning_interval:
-            self.logger.log(
+        if message['delay'] > self.delay_warning_threshold and time.time() - self.delay_warning_last > self.delay_warning_interval:
+            self.log(
                 WARN,
                 f"Receiving {message['stream']} delay too much, delay {message['delay']} ms. "
                 f"Total delay count {self.delay_warning_count}, "

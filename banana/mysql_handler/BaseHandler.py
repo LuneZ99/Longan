@@ -116,7 +116,7 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
     model: Model
     timer: threading.Timer
 
-    def __init__(self, symbol, event, expire_time):
+    def __init__(self, symbol, event, expire_time, flush_interval):
         self.symbol = symbol
         self.event = event
         cache_path = f"{cache_folder}/{symbol}@{event}"
@@ -125,7 +125,7 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         self.dc = Cache(cache_path)
         self.cache_list = list()
         self.expire_time = expire_time
-        self.flush_second = random.randint(5, 9) if "kline" in self.event else random.randint(0, 59)
+        self.flush_interval = flush_interval
         self.start_timer()
 
     def on_close(self):
@@ -146,11 +146,7 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
 
     def start_timer(self):
 
-        now = datetime.now()
-        next_run_time = now.replace(second=self.flush_second) + timedelta(minutes=1)
-        time_diff = (next_run_time - now).total_seconds()
-
-        self.timer = threading.Timer(time_diff, self.run_periodically)
+        self.timer = threading.Timer(self._get_time_diff() + random.uniform(0, self.flush_interval), self.run_periodically)
         self.timer.start()
 
     def stop_timer(self):
@@ -161,14 +157,19 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         # 在这里执行您想要定时运行的操作
         self.flush_to_sql()
 
+        # logger_md.log(INFO, f"{self.symbol}@{self.event} Now {now} Next {next_run_time}")
+        # 重新启动定时器
+        self.timer = threading.Timer(self._get_time_diff(), self.run_periodically)
+        self.timer.start()
+
+    def _get_time_diff(self):
         # 计算下一次运行的时间
         now = datetime.now()
-        next_run_time = now.replace(second=self.flush_second) + timedelta(minutes=1)
-        # logger_md.log(INFO, f"{self.symbol}@{self.event} Now {now} Next {next_run_time}")
-        time_diff = (next_run_time - now).total_seconds()
-        # 重新启动定时器
-        self.timer = threading.Timer(time_diff, self.run_periodically)
-        self.timer.start()
+        next_run_time = now + timedelta(seconds=self.flush_interval)
+        if next_run_time.second <= 3 or next_run_time.second >= 58:
+            next_run_time += timedelta(seconds=5)
+
+        return (next_run_time - now).total_seconds()
 
     def _process_line(self, data, rec_time) -> dict:
         raise NotImplementedError
