@@ -125,7 +125,7 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         self.dc = Cache(cache_path)
         self.cache_list = list()
         self.expire_time = expire_time
-        self.flush_second = 6 if "kline" in self.event else random.randint(0, 59)
+        self.flush_second = random.randint(5, 9) if "kline" in self.event else random.randint(0, 59)
         self.start_timer()
 
     def on_close(self):
