@@ -1,11 +1,12 @@
 import multiprocessing
 import signal
 import time
-from logging import WARN
+from logging import WARN, INFO
 import os
 
 from banana.market_feed.md2sql import BinanceFutureMD
 from banana.market_feed.logger import logger_md
+from banana.mysql_handler.BaseHandler import clear_cache_folder, get_cache_folder_size
 
 
 def md2sql_worker(
@@ -36,12 +37,18 @@ def split_list(lst, num_parts):
 
 
 def signal_handler(signum, frame):
-    logger_md.log(WARN, "Begin to close all workers.")
+    logger_md.log(WARN, "Close all workers.")
     for ii, pp in enumerate(multiprocessing.active_children()):
         # p.terminate()
         logger_md.log(WARN, f"Closing... subprocess {ii}")
         os.kill(pp.pid, signal.SIGINT)
         pp.join()
+
+    # logger_md.log(WARN, "Clear cache folder.")
+    # clear_cache_folder()
+
+    logger_md.log(WARN, f"Cache folder size {get_cache_folder_size()} M.")
+
     exit(0)
 
 
@@ -72,11 +79,9 @@ if __name__ == '__main__':
     ]
 
     split_num = len(symbols) * len(subscribe_list_all) // 200 + 1
-
     split_symbols = split_list(symbols, split_num)
 
-    # md2sql_worker(f"MD1", split_symbols[0], subscribe_list_all)
-    # print(len(symbols), len(subscribe_list_all), len(symbols) * len(subscribe_list_all))
+    logger_md.log(INFO, f"Starting with {len(symbols)} symbols, split to {split_num} MD workers.")
 
     processes = list()
     for i, symbols in enumerate(split_symbols):
