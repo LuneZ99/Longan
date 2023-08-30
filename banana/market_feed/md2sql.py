@@ -11,13 +11,16 @@ class SymbolStreamMysqlHandler:
         self.on_agg_trade = AggTradeHandler(symbol)
         self.on_book_ticker = BookTickerHandler(symbol)
 
+    def on_close(self):
+        self.on_agg_trade.on_close()
+
 
 class BinanceFutureMD(BaseBinanceWSClient):
     handlers: dict[str, SymbolStreamMysqlHandler]
 
-    def __init__(self, log_file="log.default", symbols=None, config_file=None, proxy=None, ws_trace=False, debug=False):
+    def __init__(self, name, symbols=None, proxy=None, ws_trace=False, debug=False):
 
-        super().__init__(log_file, config_file, proxy, ws_trace, debug)
+        super().__init__(name, proxy, ws_trace, debug)
 
         self.handlers: dict[str, SymbolStreamMysqlHandler] = {
             symbol: SymbolStreamMysqlHandler(symbol)
@@ -45,7 +48,7 @@ class BinanceFutureMD(BaseBinanceWSClient):
 
     def on_book_ticker(self, symbol: str, data: dict, rec_time: int):
         # save all bookTicker is useless.
-        # self.handlers[symbol].on_book_ticker.process_line(data, rec_time)
+        self.handlers[symbol].on_book_ticker.process_line(data, rec_time)
         pass
 
     def on_close(self, ws, code, message):

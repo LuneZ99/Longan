@@ -1,79 +1,18 @@
-import sys
+import json
+import itertools
 import json
 import time
-import queue
-import asyncio
-import logging
-import itertools
-
 from collections import defaultdict
 from datetime import datetime
 from logging import INFO, ERROR, WARN
-from logging.handlers import TimedRotatingFileHandler
 from pprint import pformat
 from typing import Callable
 
 import websocket
-import yaml
-
-from pydantic import BaseModel
 
 
-class BinanceSyncLogger:
-    def __init__(self, log_file, console=False):
-        self.log_file = log_file
-        self.queue = queue.Queue()
-        self.worker_task = None
-
-        self.logger = logging.getLogger('sync_logger')
-        self.logger.setLevel(logging.DEBUG)
-
-        file_handler = TimedRotatingFileHandler(log_file, when='midnight', interval=1, backupCount=0)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
-
-        # if console:
-        console_handler = logging.StreamHandler(sys.stdout)  # Add a console handler for printing to console
-        console_handler.setLevel(logging.DEBUG)
-        console_handler.setFormatter(formatter)
-        self.logger.addHandler(console_handler)  # Add the console handler to the logger
-
-    def log(self, level, message):
-        self.queue.put((level, message))
-        if not self.queue.empty():
-            self._write_logs()
-
-    def _write_logs(self):
-        while not self.queue.empty():
-            level, message = self.queue.get()
-            if isinstance(message, dict):
-                message = str(message)
-            self.logger.log(level, message)
-            # print(message)  # Print the message to the console
-            self.queue.task_done()
-
-    def close(self):
-        if self.worker_task:
-            self.queue.join()
-            self.worker_task.cancel()
-            try:
-                self.worker_task
-            except asyncio.CancelledError:
-                pass
-        for handler in self.logger.handlers:  # Close all handlers
-            handler.close()
-            self.logger.removeHandler(handler)
-
-
-class BinanceConfig(BaseModel):
-    strategy_name: str = ""
-
-    @classmethod
-    def load_from_yaml(cls, file_path: str):
-        with open(file_path, 'r') as f:
-            yaml_data = yaml.safe_load(f)
-        return cls(**yaml_data)
+from banana.market_feed.logger import logger_md
+from banana.market_feed.config import config_md
 
 
 def format_dict(default_dict):
@@ -85,13 +24,11 @@ def format_dict(default_dict):
 
 class BaseBinanceWSClient:
 
-    def __init__(self, log_file="log.default", config_file=None, proxy=None, ws_trace=False, debug=False):
+    def __init__(self, name, proxy=None, ws_trace=False, debug=False):
 
-        self.config = BinanceConfig()
-        if config_file is not None:
-            self.config = self.config.load_from_yaml(config_file)
-
-        self.logger = BinanceSyncLogger(log_file)
+        self.config = config_md
+        self.logger = logger_md
+        self.name = name
 
         if proxy is not None:
             if isinstance(proxy, str):
@@ -133,7 +70,7 @@ class BaseBinanceWSClient:
         订阅指定的symbol和channel
         """
 
-        print(f"Subscribe {symbol}@{channel}")
+        self.logger.log(INFO, f"Subscribe {symbol}@{channel}")
 
         self.subscribe_url += f"{symbol}@{channel}/"
         self.symbols.add(symbol)
@@ -204,10 +141,12 @@ class BaseBinanceWSClient:
     def _on_open(self, ws):
         self.connect_time = datetime.now()
         self.connect_count += 1
-        self.logger.log(INFO, "Connection started.")
+        self.logger.log(INFO, f"MD {self.name} Connection started.")
 
     def _on_close(self, ws, code, message):
-        pass
+        self.logger.log(WARN, "Websocket Connection closing ...")
+        for handler in self.handlers.values():
+            handler.on_close()
 
     def _on_message(self, ws, message):
 
@@ -226,10 +165,10 @@ class BaseBinanceWSClient:
                 self.log_count[symbol][event] % self.log_interval[symbol][event] == 0:
             self.logger.log(INFO, message)
 
-        if message['delay'] > 1000:
+        if message['delay'] > 300:
             self.delay_warning_count += 1
 
-        if message['delay'] > 1000 and time.time() - self.delay_warning_last > self.delay_warning_interval:
+        if message['delay'] > 300 and time.time() - self.delay_warning_last > self.delay_warning_interval:
             self.logger.log(
                 WARN,
                 f"Receiving {message['stream']} delay too much, delay {message['delay']} ms. "
