@@ -52,7 +52,6 @@ def signal_handler(signum, frame):
     exit(0)
 
 
-
 if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, signal_handler)
