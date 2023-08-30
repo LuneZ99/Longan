@@ -1,50 +1,77 @@
-import os
+from base_ws_client import BaseBinanceWSClient
+from banana.mysql_handler import *
 
-from base_ws_client import BinanceWSClientMD
 
-class Rec2CsvStrategy(BinanceWSClientMD):
-    handlers: dict[str, SymbolStreamCsvHandler]
+class SymbolStreamMysqlHandler:
 
-    def __init__(self, parent_path, log_file=None, symbols=None, config_file=None, proxy=None, ws_trace=False, debug=False):
+    def __init__(self, symbol):
+        self.on_kline_1m = KlineHandler(symbol, 'kline_1m')
+        self.on_kline_1h = KlineHandler(symbol, 'kline_1h')
+        self.on_kline_8h = KlineHandler(symbol, 'kline_8h')
+        self.on_agg_trade = AggTradeHandler(symbol)
+        self.on_book_ticker = BookTickerHandler(symbol)
 
-        if log_file is None:
-            log_file = os.path.join(parent_path, "log.txt")
+
+class BinanceFutureMD(BaseBinanceWSClient):
+    handlers: dict[str, SymbolStreamMysqlHandler]
+
+    def __init__(self, log_file="log.default", symbols=None, config_file=None, proxy=None, ws_trace=False, debug=False):
 
         super().__init__(log_file, config_file, proxy, ws_trace, debug)
 
-        if symbols is None:
-            symbols = ["ethusdt", "btcusdt"]
-        if not os.path.exists(parent_path):
-            os.makedirs(parent_path)
-
-        self.handlers: dict[str, SymbolStreamCsvHandler] = {
-            symbol: SymbolStreamCsvHandler(parent_path, symbol)
+        self.handlers: dict[str, SymbolStreamMysqlHandler] = {
+            symbol: SymbolStreamMysqlHandler(symbol)
             for symbol in symbols
         }
 
-    def on_agg_trade(self, symbol: str, name: str, data: dict, rec_time: int):
-        self.handlers[symbol].on_agg_trade.process_line(data)
+    def on_agg_trade(self, symbol: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_agg_trade.process_line(data, rec_time)
+        pass
 
-    def on_depth20(self, symbol: str, name: str, data: dict, rec_time: int):
-        self.handlers[symbol].on_depth20.process_line(data)
+    def on_depth20(self, symbol: str, data: dict, rec_time: int):
+        pass
 
-    def on_force_order(self, symbol: str, name: str, data: dict, rec_time: int):
-        self.handlers[symbol].on_force_order.process_line(data)
+    def on_force_order(self, symbol: str, data: dict, rec_time: int):
+        pass
 
-    def on_kline_1m(self, symbol: str, name: str, data: dict, rec_time: int):
-        self.handlers[symbol].on_kline_1m.process_line(data)
+    def on_kline_1m(self, symbol: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_kline_1m.process_line(data, rec_time)
 
-    def on_book_ticker(self, symbol: str, name: str, data: dict, rec_time: int):
-        self.handlers[symbol].on_book_ticker.process_line(data)
+    def on_kline_8h(self, symbol: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_kline_8h.process_line(data, rec_time)
+
+    def on_kline_1h(self, symbol: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_kline_1h.process_line(data, rec_time)
+
+    def on_book_ticker(self, symbol: str, data: dict, rec_time: int):
+        # save all bookTicker is useless.
+        # self.handlers[symbol].on_book_ticker.process_line(data, rec_time)
+        pass
 
     def on_close(self, ws, code, message):
+        pass
 
-        for sym, handler in self.handlers.values():
 
-            print(f"Flushing {sym} data...")
+if __name__ == '__main__':
 
-            handler.on_agg_trade.handle.flush()
-            handler.on_depth20.handle.flush()
-            handler.on_force_order.handle.flush()
-            handler.on_kline_1m.handle.flush()
-            handler.on_book_ticker.handle.flush()
+    # symbol for test
+    symbols_all = ['ethusdt', 'btcusdt', 'bnbusdt']
+
+    s = BinanceFutureMD(
+        symbols=symbols_all,
+        proxy=[
+            "http://127.0.0.1:7890",
+            # "http://i.**REMOVED**:7890",
+        ],
+        ws_trace=False
+    )
+
+    for _symbol in symbols_all:
+        s.subscribe(_symbol, "aggTrade", log_interval=50000)
+        s.subscribe(_symbol, "kline_1m", log_interval=10000)
+        s.subscribe(_symbol, "kline_8h", log_interval=10000)
+        # s.subscribe(_symbol, "depth20@100ms", log_interval=100)
+        # s.subscribe(_symbol, "forceOrder", log_interval=100)
+        s.subscribe(_symbol, "bookTicker", log_interval=50000)
+
+    s.run()

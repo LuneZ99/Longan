@@ -1,21 +1,72 @@
-import itertools
-import json
 import sys
+import json
 import time
+import queue
+import asyncio
+import logging
+import itertools
+
 from collections import defaultdict
 from datetime import datetime
-from logging import INFO, ERROR
+from logging import INFO, ERROR, WARN
+from logging.handlers import TimedRotatingFileHandler
 from pprint import pformat
 from typing import Callable
 
 import websocket
 import yaml
-from pydantic import BaseSettings
 
-from Logger import BinanceSyncLogger
+from pydantic import BaseModel
 
 
-class BinanceConfig(BaseSettings):
+class BinanceSyncLogger:
+    def __init__(self, log_file, console=False):
+        self.log_file = log_file
+        self.queue = queue.Queue()
+        self.worker_task = None
+
+        self.logger = logging.getLogger('sync_logger')
+        self.logger.setLevel(logging.DEBUG)
+
+        file_handler = TimedRotatingFileHandler(log_file, when='midnight', interval=1, backupCount=0)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+
+        # if console:
+        console_handler = logging.StreamHandler(sys.stdout)  # Add a console handler for printing to console
+        console_handler.setLevel(logging.DEBUG)
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)  # Add the console handler to the logger
+
+    def log(self, level, message):
+        self.queue.put((level, message))
+        if not self.queue.empty():
+            self._write_logs()
+
+    def _write_logs(self):
+        while not self.queue.empty():
+            level, message = self.queue.get()
+            if isinstance(message, dict):
+                message = str(message)
+            self.logger.log(level, message)
+            # print(message)  # Print the message to the console
+            self.queue.task_done()
+
+    def close(self):
+        if self.worker_task:
+            self.queue.join()
+            self.worker_task.cancel()
+            try:
+                self.worker_task
+            except asyncio.CancelledError:
+                pass
+        for handler in self.logger.handlers:  # Close all handlers
+            handler.close()
+            self.logger.removeHandler(handler)
+
+
+class BinanceConfig(BaseModel):
     strategy_name: str = ""
 
     @classmethod
@@ -32,7 +83,7 @@ def format_dict(default_dict):
         return default_dict.__str__().split(' ')[2]
 
 
-class BinanceWSClientMD:
+class BaseBinanceWSClient:
 
     def __init__(self, log_file="log.default", config_file=None, proxy=None, ws_trace=False, debug=False):
 
@@ -61,12 +112,20 @@ class BinanceWSClientMD:
         self.log_interval: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
         self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
 
+        self.total_message_count = 0
+
         self.subscribe_url = "wss://fstream.binance.com/stream?streams="
+        self.subscribe_count = 0
+
         websocket.enableTrace(ws_trace)
         self.debug = debug
 
         self.connect_time = None
         self.connect_count = 0
+
+        self.delay_warning_last = 0
+        self.delay_warning_interval = 30
+        self.delay_warning_count = 0
 
     def subscribe(self, symbol: str, channel: str, log_interval: int = True):
 
@@ -85,6 +144,11 @@ class BinanceWSClientMD:
         self.log_interval[symbol][channel] = log_interval
         self.log_count[symbol][channel] = 0
         self.callbacks[symbol][channel] = self._get_callbacks(channel)
+
+        self.subscribe_count += 1
+        if self.subscribe_count >= 200:
+            self.logger.log(ERROR, f"Subscribed {symbol} failed because {self.subscribe_count} is larger than 200")
+            raise ValueError(f"Subscribed {symbol} failed because {self.subscribe_count} is larger than 200")
 
     def _get_callbacks(self, channel):
 
@@ -110,14 +174,15 @@ class BinanceWSClientMD:
             raise ValueError("Please subscribe a symbol first.")
 
         ws = websocket.WebSocketApp(
-            self.subscribe_url,
+            self.subscribe_url[:-1],
             on_message=self._on_message,
             on_open=self._on_open,
             on_close=self._on_close
         )
 
-        self.logger.log(INFO, f"Strategy Start with subscription url: {self.subscribe_url}")
+        self.logger.log(INFO, f"Strategy Start with subscription url: {self.subscribe_url[:-1]}")
         self.logger.log(INFO, f"CallBacks: \n{pformat(format_dict(self.callbacks))}")
+        self.logger.log(INFO, f"Total subscribe num: {self.subscribe_count}")
 
         if self.proxy is None:
             while True:
@@ -131,7 +196,9 @@ class BinanceWSClientMD:
                     http_proxy_port=proxy[2],
                     proxy_type=proxy[0]
                 )
+                ws.close()
                 self.logger.log(ERROR, f"Websocket disconnected, retrying ...")
+                self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
                 time.sleep(5)
 
     def _on_open(self, ws):
@@ -140,20 +207,11 @@ class BinanceWSClientMD:
         self.logger.log(INFO, "Connection started.")
 
     def _on_close(self, ws, code, message):
-
-        self.on_close(ws, code, message)
-
-        if (datetime.now() - self.connect_time).seconds > 60:
-
-            self.logger.log(ERROR, f"Connection close. Code {code}. Message {message}")
-            self.logger.log(ERROR, f"Connection reset time {self.connect_count}, last run total time is {(datetime.now() - self.connect_time).seconds} seconds.")
-            # self.run()
-        else:
-            self.logger.log(ERROR, f"Connection reset too quickly, stop !!!")
-            sys.exit(0)
+        pass
 
     def _on_message(self, ws, message):
 
+        self.total_message_count += 1
         message = json.loads(message)
         rec_time = time.time_ns() // 1_000_000
         ori_time = message['data']['E']
@@ -164,30 +222,43 @@ class BinanceWSClientMD:
         event = stream_list[1]
         data: dict = message['data']
 
-        if self.log_interval[symbol][event] > 0 and self.log_count[symbol][event] % self.log_interval[symbol][event] == 0:
+        if self.log_interval[symbol][event] > 0 and \
+                self.log_count[symbol][event] % self.log_interval[symbol][event] == 0:
             self.logger.log(INFO, message)
 
-        self.callbacks[symbol][event](symbol, event, data, rec_time)
+        if message['delay'] > 1000:
+            self.delay_warning_count += 1
+
+        if message['delay'] > 1000 and time.time() - self.delay_warning_last > self.delay_warning_interval:
+            self.logger.log(
+                WARN,
+                f"Receiving {message['stream']} delay too much, delay {message['delay']} ms. "
+                f"Total delay count {self.delay_warning_count}, "
+                f"{self.delay_warning_count / self.total_message_count:.2%} of all messages. "
+            )
+            self.delay_warning_last = time.time()
+
+        self.callbacks[symbol][event](symbol, data, rec_time)
         self.log_count[symbol][event] += 1
 
     @staticmethod
     def on_missing(symbol: str, name: str, data: dict, rec_time: int):
         raise KeyError(f"Missing Callback on {symbol} {name}")
 
-    def on_agg_trade(self, symbol: str, name: str, data: dict, rec_time: int):
-        raise NotImplementedError
-
-    def on_depth20(self, symbol: str, name: str, data: dict, rec_time: int):
-        raise NotImplementedError
-
-    def on_force_order(self, symbol: str, name: str, data: dict, rec_time: int):
-        raise NotImplementedError
-
-    def on_kline_1m(self, symbol: str, name: str, data: dict, rec_time: int):
-        raise NotImplementedError
-
-    def on_book_ticker(self, symbol: str, name: str, data: dict, rec_time: int):
-        raise NotImplementedError
+    # def on_agg_trade(self, symbol: str, name: str, data: dict, rec_time: int):
+    #     raise NotImplementedError
+    #
+    # def on_depth20(self, symbol: str, name: str, data: dict, rec_time: int):
+    #     raise NotImplementedError
+    #
+    # def on_force_order(self, symbol: str, name: str, data: dict, rec_time: int):
+    #     raise NotImplementedError
+    #
+    # def on_kline_1m(self, symbol: str, name: str, data: dict, rec_time: int):
+    #     raise NotImplementedError
+    #
+    # def on_book_ticker(self, symbol: str, name: str, data: dict, rec_time: int):
+    #     raise NotImplementedError
 
     def on_close(self, ws, code, message):
         pass
