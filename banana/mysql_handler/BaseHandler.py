@@ -1,8 +1,10 @@
 # from gevent import monkey; monkey.patch_all()
 # import gevent
-
+import os
 import random
-from datetime import datetime
+import shutil
+import threading
+from datetime import datetime, timedelta
 from logging import INFO, WARN
 
 from diskcache import Cache
@@ -34,6 +36,21 @@ kline_list = [
 ]
 
 cache_folder = "/tmp/binance_cache"
+
+
+def clear_cache_folder():
+    shutil.rmtree(cache_folder)
+
+
+def get_cache_folder_size():
+    total_size = 0
+    for path, dirs, files in os.walk(cache_folder):
+        for file in files:
+            file_path = os.path.join(path, file)
+            total_size += os.path.getsize(file_path)
+
+    # MB
+    return round(total_size / 1024 / 1024, 2)
 
 
 class BaseHandler:
@@ -74,8 +91,10 @@ class BaseStreamDiskCacheHandler(BaseHandler):
     def __init__(self, symbol, event, expire_time):
         self.symbol = symbol
         self.event = event
-        self.dc = Cache(f"{cache_folder}/{symbol}@{event}")
-        logger_md.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
+        cache_path = f"{cache_folder}/{symbol}@{event}"
+        if not os.path.exists(cache_path):
+            logger_md.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
+        self.dc = Cache(cache_path)
         self.expire_time = expire_time
 
     def on_close(self):
@@ -95,16 +114,19 @@ class BaseStreamDiskCacheHandler(BaseHandler):
 
 class BaseStreamDiskCacheMysqlHandler(BaseHandler):
     model: Model
+    timer: threading.Timer
 
     def __init__(self, symbol, event, expire_time):
         self.symbol = symbol
         self.event = event
-        self.dc = Cache(f"{cache_folder}/{symbol}@{event}")
-        logger_md.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
+        cache_path = f"{cache_folder}/{symbol}@{event}"
+        if not os.path.exists(cache_path):
+            logger_md.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
+        self.dc = Cache(cache_path)
         self.cache_list = list()
         self.expire_time = expire_time
-        self.last_flush_time = datetime.now().minute
-        self.rand_flush_second = random.randint(0, 58)
+        self.flush_second = 6 if "kline" in self.event else random.randint(0, 59)
+        self.start_timer()
 
     def on_close(self):
         logger_md.log(WARN, f"Closing... Flush {self.symbol}@{self.event} to sql")
@@ -113,33 +135,40 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
     def process_line(self, data, rec_time):
         if line := self._process_line(data, rec_time):
             self.dc.push(line, expire=self.expire_time)
-
-            # logger_md.log(
-            #     INFO,
-            #     f"Push to {cache_folder}/{self.symbol}@{self.event}"
-            # )
-
             self.cache_list.append(line)
-            minute_now = datetime.now().minute
-            second_now = datetime.now().second
-            if (
-                    (minute_now != self.last_flush_time and second_now > self.rand_flush_second) or
-                    abs(minute_now - self.last_flush_time) > 1
-            ) and len(self.cache_list) > 0:
-
-                logger_md.log(
-                    INFO,
-                    f"Flush {self.symbol}@{self.event} [{len(self.cache_list)}] to sql, "
-                    f"time_now: {minute_now:0>2}:{second_now:0>2}, last_flush_minute: {self.last_flush_time:0>2}."
-                )
-                self.flush_to_sql()
-                # gevent.spawn(self.flush_to_sql).join()
-                self.cache_list.clear()
-                self.last_flush_time = minute_now
 
     def flush_to_sql(self):
         # with db.atomic():
-        self.model.insert_many(self.cache_list).execute()
+        if len(self.cache_list) > 0:
+            logger_md.log(INFO, f"Flush {self.symbol}@{self.event} [{len(self.cache_list)}] to sql.")
+            self.model.insert_many(self.cache_list).execute()
+            self.cache_list.clear()
+
+    def start_timer(self):
+
+        now = datetime.now()
+        next_run_time = now.replace(second=self.flush_second) + timedelta(minutes=1)
+        time_diff = (next_run_time - now).total_seconds()
+
+        self.timer = threading.Timer(time_diff, self.run_periodically)
+        self.timer.start()
+
+    def stop_timer(self):
+        if self.timer:
+            self.timer.cancel()
+
+    def run_periodically(self):
+        # 在这里执行您想要定时运行的操作
+        self.flush_to_sql()
+
+        # 计算下一次运行的时间
+        now = datetime.now()
+        next_run_time = now.replace(second=self.flush_second) + timedelta(minutes=1)
+        # logger_md.log(INFO, f"{self.symbol}@{self.event} Now {now} Next {next_run_time}")
+        time_diff = (next_run_time - now).total_seconds()
+        # 重新启动定时器
+        self.timer = threading.Timer(time_diff, self.run_periodically)
+        self.timer.start()
 
     def _process_line(self, data, rec_time) -> dict:
         raise NotImplementedError

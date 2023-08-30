@@ -1,6 +1,6 @@
 from peewee import *
-
-from .BaseHandler import kline_list, generate_models, BaseStreamMysqlHandler
+from diskcache import Cache
+from .BaseHandler import kline_list, generate_models, BaseStreamDiskCacheMysqlHandler, cache_folder
 
 # 设置 MySQL 数据库连接
 db = MySQLDatabase(
@@ -43,15 +43,17 @@ class BaseKline(Model):
 models_kline: dict[str, BaseKline] = generate_models(kline_list, BaseKline)
 
 
-class KlineHandler(BaseStreamMysqlHandler):
+class KlineHandler(BaseStreamDiskCacheMysqlHandler):
+    # cross-section KLine in cache and sql
 
-    def __init__(self, symbol, event):
-        assert "kline" in event, "This handler is only supported for kline streams"
-        super().__init__(symbol, event)
+    def __init__(self, symbol, event, expire_time=32 * 24 * 60 * 60):
+        super().__init__(symbol, event, expire_time)
         self.model = models_kline[self.event.replace("_", "")]
+        self.dc = Cache(f"{cache_folder}/{event}")
 
     def _process_line(self, data, rec_time):
         if data['k']['x']:
+            # todo: WARNING for rec_time > 1s
             return dict(
                 symbol=self.symbol,
                 rec_time=rec_time,
