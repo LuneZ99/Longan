@@ -1,6 +1,6 @@
 from peewee import *
+from .BaseHandler import future_usdt_symbol_all, generate_models, BaseStreamDiskCacheMysqlHandler
 
-from .BaseHandler import future_usdt_symbol_all, generate_models, BaseStreamMysqlHandler
 
 # 设置 MySQL 数据库连接
 db = MySQLDatabase(
@@ -33,13 +33,14 @@ class BaseAggTrade(Model):
 models_agg_trades = generate_models(future_usdt_symbol_all, BaseAggTrade)
 
 
-class AggTradeHandler(BaseStreamMysqlHandler):
+class AggTradeHandler(BaseStreamDiskCacheMysqlHandler):
 
-    def __init__(self, symbol, event='aggTrade'):
-        super().__init__(symbol, event)
+    def __init__(self, symbol, event='aggTrade', expire_time=180):
+        super().__init__(symbol, event, expire_time)
+        self.model = models_agg_trades[self.symbol]
 
     def _process_line(self, data, rec_time):
-        models_agg_trades[self.symbol].create(
+        return dict(
             agg_trade_id=data['a'],
             rec_time=rec_time,
             event_time=data['E'],

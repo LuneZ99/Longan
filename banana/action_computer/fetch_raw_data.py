@@ -5,8 +5,10 @@ from banana.mysql_handler import *
 from datetime import datetime, timedelta
 
 query = models_kline['kline1m'].select().where(
-    models_kline['kline1m'].symbol == "ethusdt"
+    models_kline['kline1m'].symbol == "1000flokiusdt"
 )
+
+
 
 df = pd.DataFrame(list(query.dicts()))
 
@@ -14,8 +16,6 @@ print(df.iloc[-1]['close_time']+1)
 print(datetime.fromtimestamp((df.iloc[-1]['close_time']+1) / 1000))
 # 1693159725654
 # 1693152000
-
-
 
 
 def get_timestamps():

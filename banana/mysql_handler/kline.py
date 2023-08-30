@@ -48,10 +48,11 @@ class KlineHandler(BaseStreamMysqlHandler):
     def __init__(self, symbol, event):
         assert "kline" in event, "This handler is only supported for kline streams"
         super().__init__(symbol, event)
+        self.model = models_kline[self.event.replace("_", "")]
 
     def _process_line(self, data, rec_time):
         if data['k']['x']:
-            models_kline[self.event.replace("-", "")].create(
+            return dict(
                 symbol=self.symbol,
                 rec_time=rec_time,
                 event_time=data['E'],
@@ -67,3 +68,4 @@ class KlineHandler(BaseStreamMysqlHandler):
                 taker_buy_volume=data['k']['V'],
                 taker_buy_quote_volume=data['k']['Q']
             )
+

@@ -1,17 +1,20 @@
 import multiprocessing
 import signal
 import time
+from logging import WARN
+import os
 
 from banana.market_feed.md2sql import BinanceFutureMD
+from banana.market_feed.logger import logger_md
 
 
 def md2sql_worker(
-        worker_name, symbols_all, subscribe_list,
+        name, symbols_all, subscribe_list,
         log_interval=10000, proxy="http://127.0.0.1:7890", ws_trace=False
 ):
 
     s = BinanceFutureMD(
-        log_file=f"{worker_name}.log",
+        name=name,
         symbols=symbols_all,
         proxy=proxy,
         ws_trace=ws_trace
@@ -33,10 +36,12 @@ def split_list(lst, num_parts):
 
 
 def signal_handler(signum, frame):
-    print("接收到信号，开始关闭子进程和主进程")
-    for p in multiprocessing.active_children():
-        p.terminate()
-        p.join()
+    logger_md.log(WARN, "Begin to close all workers.")
+    for ii, pp in enumerate(multiprocessing.active_children()):
+        # p.terminate()
+        logger_md.log(WARN, f"Closing... subprocess {ii}")
+        os.kill(pp.pid, signal.SIGINT)
+        pp.join()
     exit(0)
 
 
@@ -70,25 +75,16 @@ if __name__ == '__main__':
 
     split_symbols = split_list(symbols, split_num)
 
-    for symbol in split_symbols:
-        print(len(symbol))
-
-    md2sql_worker(f"MD1", split_symbols[0], subscribe_list_all)
-
+    # md2sql_worker(f"MD1", split_symbols[0], subscribe_list_all)
     # print(len(symbols), len(subscribe_list_all), len(symbols) * len(subscribe_list_all))
 
+    processes = list()
+    for i, symbols in enumerate(split_symbols):
+        p = multiprocessing.Process(target=md2sql_worker, args=(i, symbols, subscribe_list_all, 0))
+        p.daemon = True
+        p.start()
+        processes.append(p)
 
-    # processes = list()
-    # for param in parameters:
-    #     p = multiprocessing.Process(target=worker, args=(param,))
-    #     p.daemon = True
-    #     p.start()
-    #     processes.append(p)
-    #
-    # p = multiprocessing.Process(target=md2sql_worker, args=("name",))
-    # p.daemon = True
-    # p.start()
-    #
-    # while True:
-    #     time.sleep(1)
+    while True:
+        time.sleep(1)
 
