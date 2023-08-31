@@ -1,3 +1,5 @@
+from typing import Any
+
 from peewee import *
 from diskcache import Cache
 from .BaseHandler import kline_list, generate_models, BaseStreamDiskCacheMysqlHandler, cache_folder
@@ -47,14 +49,14 @@ class KlineHandler(BaseStreamDiskCacheMysqlHandler):
     # cross-section KLine in cache and sql
 
     def __init__(self, symbol, event, expire_time=32 * 24 * 60 * 60, flush_interval=120):
-        super().__init__(symbol, event, expire_time, flush_interval)
+        cache_path = f"{cache_folder}/{event}"
+        super().__init__(symbol, event, cache_path, expire_time, flush_interval)
         self.model = models_kline[self.event.replace("_", "")]
-        self.dc = Cache(f"{cache_folder}/{event}")
 
-    def _process_line(self, data, rec_time):
+    def _process_line(self, data, rec_time) -> tuple[Any, dict]:
         if data['k']['x']:
             # todo: WARNING for rec_time > 1s
-            return dict(
+            return f"{data['k']['T']}_{self.symbol}", dict(
                 symbol=self.symbol,
                 rec_time=rec_time,
                 event_time=data['E'],
