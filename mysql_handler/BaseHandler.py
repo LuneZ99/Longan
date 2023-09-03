@@ -10,7 +10,7 @@ from logging import INFO, WARN
 from diskcache import Cache
 from peewee import Model
 
-from banana.market_feed.logger import logger_md
+from market_data.logger import logger_md
 
 future_usdt_symbol_all = [f'{x}USDT'.lower() for x in [
     '1000FLOKI', '1000LUNC', '1000PEPE', '1000SHIB', '1000XEC', '1INCH', 'AAVE', 'ACH', 'ADA', 'AGIX', 'AGLD',
@@ -35,7 +35,7 @@ kline_list = [
     'kline8h',
 ]
 
-cache_folder = "/tmp/binance_cache"
+cache_folder = "/mnt/0/tmp/binance_cache"
 
 
 def clear_cache_folder():

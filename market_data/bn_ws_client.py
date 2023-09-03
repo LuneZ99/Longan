@@ -1,4 +1,3 @@
-import json
 import itertools
 import json
 import time
@@ -11,8 +10,8 @@ from typing import Callable
 import websocket
 
 
-from banana.market_feed.logger import logger_md
-from banana.market_feed.config import config_md
+from market_data.logger import logger_md
+from market_data.config import config_md
 
 
 def format_dict(default_dict):
