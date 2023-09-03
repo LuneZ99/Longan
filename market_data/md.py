@@ -29,6 +29,7 @@ def signal_handler(signum, frame):
     # clear_cache_folder()
 
     logger_md.log(WARN, f"Cache folder size {get_cache_folder_size()} M.")
+    time.sleep(5)
 
     exit(0)
 

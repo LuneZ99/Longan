@@ -6,8 +6,9 @@ import shutil
 import threading
 from datetime import datetime, timedelta
 from logging import INFO, WARN
+from typing import Any
 
-from diskcache import Cache
+from diskcache import Cache, FanoutCache
 from peewee import Model
 
 from market_data.logger import logger_md
@@ -94,21 +95,20 @@ class BaseStreamDiskCacheHandler(BaseHandler):
         cache_path = f"{cache_folder}/{symbol}@{event}"
         if not os.path.exists(cache_path):
             logger_md.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
-        self.dc = Cache(cache_path)
+        self.dc = Cache(cache_path, timeout=0.1)
         self.expire_time = expire_time
 
     def on_close(self):
         pass
 
     def process_line(self, data, rec_time):
-        if line := self._process_line(data, rec_time):
+        key, line = self._process_line(data, rec_time)
+        if key is None:
             self.dc.push(line, expire=self.expire_time)
-            # logger_md.log(
-            #     INFO,
-            #     f"Push to {cache_folder}/{self.symbol}@{self.event}"
-            # )
+        else:
+            self.dc.set(key, line, expire=self.expire_time)
 
-    def _process_line(self, data, rec_time) -> dict:
+    def _process_line(self, data, rec_time) -> tuple[str, dict]:
         raise NotImplementedError
 
 
@@ -116,13 +116,13 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
     model: Model
     timer: threading.Timer
 
-    def __init__(self, symbol, event, expire_time, flush_interval):
+    def __init__(self, symbol, event, cache_path, expire_time, flush_interval):
         self.symbol = symbol
         self.event = event
-        cache_path = f"{cache_folder}/{symbol}@{event}"
+        # cache_path = f"{cache_folder}/{symbol}@{event}"
         if not os.path.exists(cache_path):
             logger_md.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
-        self.dc = Cache(cache_path)
+        self.dc = Cache(cache_path, timeout=0.1)
         self.cache_list = list()
         self.expire_time = expire_time
         self.flush_interval = flush_interval
@@ -133,9 +133,12 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         self.flush_to_sql()
 
     def process_line(self, data, rec_time):
-        if line := self._process_line(data, rec_time):
+        key, line = self._process_line(data, rec_time)
+        if key is None:
             self.dc.push(line, expire=self.expire_time)
-            self.cache_list.append(line)
+        else:
+            self.dc.set(key, line, expire=self.expire_time)
+        self.cache_list.append(line)
 
     def flush_to_sql(self):
         # with db.atomic():
@@ -171,7 +174,7 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
 
         return (next_run_time - now).total_seconds()
 
-    def _process_line(self, data, rec_time) -> dict:
+    def _process_line(self, data, rec_time) -> tuple[Any, dict]:
         raise NotImplementedError
 
 
@@ -196,3 +199,5 @@ def generate_models(table_names, meta_type):
             model.create_table()
 
     return models
+
+
