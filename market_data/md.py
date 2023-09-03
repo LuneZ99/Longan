@@ -11,8 +11,8 @@ from mysql_handler import *
 
 def split_list(lst, num_parts):
     result = [[] for _ in range(num_parts)]
-    for i, num in enumerate(lst):
-        index = i % num_parts
+    for ii, num in enumerate(lst):
+        index = ii % num_parts
         result[index].append(num)
     return result
 
