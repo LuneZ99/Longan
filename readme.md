@@ -6,6 +6,7 @@
 ### websocket market data
 
 - [ ] depth20 适配
+- [ ] marketPrice 适配
 
 ### binance api wrapper 
 
