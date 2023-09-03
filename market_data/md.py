@@ -1,31 +1,12 @@
 import multiprocessing
+import os
 import signal
 import time
 from logging import WARN, INFO
-import os
 
-from banana.market_feed.md2sql import BinanceFutureMD
-from banana.market_feed.logger import logger_md
-from banana.mysql_handler.BaseHandler import clear_cache_folder, get_cache_folder_size
-
-
-def md2sql_worker(
-        name, symbols_all, subscribe_list,
-        log_interval=10000, proxy="http://127.0.0.1:7890", ws_trace=False
-):
-
-    s = BinanceFutureMD(
-        name=name,
-        symbols=symbols_all,
-        proxy=proxy,
-        ws_trace=ws_trace
-    )
-
-    for _symbol in symbols_all:
-        for md in subscribe_list:
-            s.subscribe(_symbol, md, log_interval=log_interval)
-
-    s.run()
+from market_data.bn_ws_client import BaseBinanceWSClient
+from market_data.logger import logger_md
+from mysql_handler import *
 
 
 def split_list(lst, num_parts):
@@ -50,6 +31,79 @@ def signal_handler(signum, frame):
     logger_md.log(WARN, f"Cache folder size {get_cache_folder_size()} M.")
 
     exit(0)
+
+
+class SymbolStreamMysqlHandler:
+
+    def __init__(self, symbol):
+        self.on_kline_1m = KlineHandler(symbol, 'kline_1m')
+        self.on_kline_1h = KlineHandler(symbol, 'kline_1h')
+        self.on_kline_8h = KlineHandler(symbol, 'kline_8h')
+        self.on_agg_trade = AggTradeHandler(symbol)
+        self.on_book_ticker = BookTickerHandler(symbol)
+
+    def on_close(self):
+        self.on_agg_trade.on_close()
+        self.on_kline_1m.on_close()
+        self.on_kline_1h.on_close()
+        self.on_kline_8h.on_close()
+
+
+class BinanceFutureMD(BaseBinanceWSClient):
+    handlers: dict[str, SymbolStreamMysqlHandler]
+
+    def __init__(self, name, symbols=None, proxy=None, ws_trace=False, debug=False):
+        super().__init__(name, proxy, ws_trace, debug)
+
+        self.handlers: dict[str, SymbolStreamMysqlHandler] = {
+            symbol: SymbolStreamMysqlHandler(symbol)
+            for symbol in symbols
+        }
+
+    def on_agg_trade(self, symbol: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_agg_trade.process_line(data, rec_time)
+        pass
+
+    def on_depth20(self, symbol: str, data: dict, rec_time: int):
+        pass
+
+    def on_force_order(self, symbol: str, data: dict, rec_time: int):
+        pass
+
+    def on_kline_1m(self, symbol: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_kline_1m.process_line(data, rec_time)
+
+    def on_kline_8h(self, symbol: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_kline_8h.process_line(data, rec_time)
+
+    def on_kline_1h(self, symbol: str, data: dict, rec_time: int):
+        self.handlers[symbol].on_kline_1h.process_line(data, rec_time)
+
+    def on_book_ticker(self, symbol: str, data: dict, rec_time: int):
+        # save all bookTicker is useless.
+        self.handlers[symbol].on_book_ticker.process_line(data, rec_time)
+        pass
+
+    def on_close(self, ws, code, message):
+        pass
+
+
+def md2sql_worker(
+        name, symbols_all, subscribe_list,
+        log_interval=10000, proxy="http://127.0.0.1:7890", ws_trace=False
+):
+    s = BinanceFutureMD(
+        name=name,
+        symbols=symbols_all,
+        proxy=proxy,
+        ws_trace=ws_trace
+    )
+
+    for _symbol in symbols_all:
+        for md in subscribe_list:
+            s.subscribe(_symbol, md, log_interval=log_interval)
+
+    s.run()
 
 
 if __name__ == '__main__':
@@ -91,4 +145,3 @@ if __name__ == '__main__':
 
     while True:
         time.sleep(1)
-
