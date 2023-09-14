@@ -5,7 +5,7 @@ import random
 import shutil
 import threading
 from datetime import datetime, timedelta
-from logging import INFO, WARN
+from logging import INFO, WARN, DEBUG
 from typing import Any
 
 from diskcache import Cache, FanoutCache
@@ -116,13 +116,14 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
     model: Model
     timer: threading.Timer
 
-    def __init__(self, symbol, event, cache_path, expire_time, flush_interval):
+    def __init__(self, symbol, event, expire_time, flush_interval):
         self.symbol = symbol
         self.event = event
-        # cache_path = f"{cache_folder}/{symbol}@{event}"
+        cache_path = f"{cache_folder}/{symbol}@{event}"
         if not os.path.exists(cache_path):
             logger_md.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
         self.dc = Cache(cache_path, timeout=0.1)
+        logger_md.log(DEBUG, f"Success load cache on {cache_folder}/{symbol}@{event}")
         self.cache_list = list()
         self.expire_time = expire_time
         self.flush_interval = flush_interval
