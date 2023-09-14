@@ -7,12 +7,13 @@
 
 - [ ] depth20 适配
 - [ ] marketPrice 适配
+- [ ] 使用 config.yaml 配置化
 
 ### binance api wrapper 
 
 - [ ] 历史行情接口
 - [ ] 账户状态接口
-
+- [ ] 查询 api
 
 ### websocket trader
 
