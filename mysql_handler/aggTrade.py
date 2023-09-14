@@ -38,8 +38,7 @@ models_agg_trades = generate_models(future_usdt_symbol_all, BaseAggTrade)
 class AggTradeHandler(BaseStreamDiskCacheMysqlHandler):
 
     def __init__(self, symbol, event='aggTrade', expire_time=180, flush_interval=120):
-        cache_path = f"{cache_folder}/{symbol}@{event}"
-        super().__init__(symbol, event, cache_path, expire_time, flush_interval)
+        super().__init__(symbol, event, expire_time, flush_interval)
         self.model = models_agg_trades[self.symbol]
 
     def _process_line(self, data, rec_time) -> tuple[Any, dict]:

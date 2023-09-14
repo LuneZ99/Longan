@@ -49,8 +49,7 @@ class KlineHandler(BaseStreamDiskCacheMysqlHandler):
     # cross-section KLine in cache and sql
 
     def __init__(self, symbol, event, expire_time=32 * 24 * 60 * 60, flush_interval=120):
-        cache_path = f"{cache_folder}/{event}"
-        super().__init__(symbol, event, cache_path, expire_time, flush_interval)
+        super().__init__(symbol, event, expire_time, flush_interval)
         self.model = models_kline[self.event.replace("_", "")]
 
     def _process_line(self, data, rec_time) -> tuple[Any, dict]:

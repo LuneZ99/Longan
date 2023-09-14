@@ -129,10 +129,15 @@ if __name__ == '__main__':
     ]]
 
     subscribe_list_all = [
-        'kline_1m', 'kline_1h', 'kline_8h', 'aggTrade', 'bookTicker', 'depth20'
+        'kline_1m',
+        'kline_1h',
+        'kline_8h',
+        'aggTrade',
+        'bookTicker',
+        # 'depth20'
     ]
 
-    split_num = len(symbols) * len(subscribe_list_all) // 200 + 1
+    split_num = len(symbols) * len(subscribe_list_all) // 200 + 2
     split_symbols = split_list(symbols, split_num)
 
     logger_md.log(INFO, f"Starting with {len(symbols)} symbols, split to {split_num} MD workers.")
