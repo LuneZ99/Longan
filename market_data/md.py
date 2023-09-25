@@ -5,8 +5,8 @@ import time
 from logging import WARN, INFO
 
 from market_data.bn_ws_client import BaseBinanceWSClient
-from market_data.logger import logger_md
-from mysql_handler import *
+from utils import logger_md
+from data_handler import *
 
 
 def split_list(lst, num_parts):

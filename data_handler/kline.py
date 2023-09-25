@@ -1,16 +1,20 @@
 from typing import Any
 
 from peewee import *
-from diskcache import Cache
-from .BaseHandler import kline_list, generate_models, BaseStreamDiskCacheMysqlHandler, cache_folder
+from utils import config, generate_models
+from data_handler.DiskCacheHandler import BaseStreamDiskCacheMysqlHandler
+
+
+kline_list = config.kline_list
+
 
 # 设置 MySQL 数据库连接
 db = MySQLDatabase(
     'binance_kline',
-    user='root',
-    password='**REMOVED**',
-    host='**REMOVED**',
-    port=10003
+    user=config.mysql.user,
+    password=config.mysql.password,
+    host=config.mysql.host,
+    port=config.mysql.port
 )
 
 
