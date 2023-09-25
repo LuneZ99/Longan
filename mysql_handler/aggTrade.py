@@ -1,7 +1,7 @@
 from typing import Any
 
 from peewee import *
-from .BaseHandler import future_usdt_symbol_all, generate_models, BaseStreamDiskCacheMysqlHandler, cache_folder
+from mysql_handler.BaseHandler import future_usdt_symbol_all, generate_models, BaseStreamDiskCacheMysqlHandler, cache_folder
 
 
 # 设置 MySQL 数据库连接
