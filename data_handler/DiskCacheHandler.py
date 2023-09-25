@@ -9,10 +9,11 @@ from typing import Any
 from diskcache import Cache
 from peewee import Model
 
-from market_data.logger import logger_md
-from mysql_handler.BaseHandler import BaseHandler
+from data_handler.BaseHandler import BaseHandler
+from utils import logger_md, config
 
-cache_folder = "/mnt/0/tmp/binance_cache"
+
+cache_folder = config.disk_cache_folder
 
 
 def clear_cache_folder():
@@ -28,6 +29,10 @@ def get_cache_folder_size():
 
     # MB
     return round(total_size / 1024 / 1024, 2)
+
+
+def get_disk_cache(symbol, event):
+    return Cache(cache_folder=f"{cache_folder}/{symbol}@{event}")
 
 
 class BaseStreamDiskCacheHandler(BaseHandler):

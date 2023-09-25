@@ -1,6 +1,6 @@
 import pandas as pd
 
-from mysql_handler import *
+from data_handler import *
 
 from datetime import datetime, timedelta
 

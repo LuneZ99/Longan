@@ -9,9 +9,7 @@ from typing import Callable
 
 import websocket
 
-
-from market_data.logger import logger_md
-from market_data.config import config_md
+from utils import config, logger_md
 
 
 def format_dict(default_dict):
@@ -25,7 +23,7 @@ class BaseBinanceWSClient:
 
     def __init__(self, name, proxy=None, ws_trace=False, debug=False):
 
-        self.config = config_md
+        self.config = config
         self.logger = logger_md
         self.name = name
 
@@ -63,7 +61,6 @@ class BaseBinanceWSClient:
         self.delay_warning_last = 0
         self.delay_warning_interval = 30
         self.delay_warning_count = 0
-
 
     def log(self, level, msg):
         self.logger.log(level, f"MD-{self.name}: {msg}")
@@ -171,7 +168,8 @@ class BaseBinanceWSClient:
         if message['delay'] > self.delay_warning_threshold:
             self.delay_warning_count += 1
 
-        if message['delay'] > self.delay_warning_threshold and time.time() - self.delay_warning_last > self.delay_warning_interval:
+        if message[
+            'delay'] > self.delay_warning_threshold and time.time() - self.delay_warning_last > self.delay_warning_interval:
             self.log(
                 WARN,
                 f"Receiving {message['stream']} delay too much, delay {message['delay']} ms. "

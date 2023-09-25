@@ -24,7 +24,10 @@ class DotDict(dict):
     def __getattr__(self, item) -> Any:
         # needed for mypy checks
         # try to get the default attribute from Dict
-        return self._getattr__(item) if item in self else getattr(super, item, None)
+        try:
+            return self._getattr__(item) if item in self else getattr(super, item)
+        except AttributeError:
+            raise AttributeError(f'Cannot find {item} in class or super classes')
 
     def __setattr__(self, name: str, value) -> None:
         try:
@@ -50,3 +53,10 @@ class DotDict(dict):
         with open(file_path, 'r') as file:
             yaml_data = yaml.safe_load(file)
         return cls(yaml_data)
+
+
+if __name__ == '__main__':
+    d = DotDict()
+    d.a = 1
+    print(d.a)
+    print(d.b)

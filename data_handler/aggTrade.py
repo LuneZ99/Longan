@@ -1,16 +1,17 @@
 from typing import Any
 
 from peewee import *
-from mysql_handler.BaseHandler import future_usdt_symbol_all, generate_models, BaseStreamDiskCacheMysqlHandler, cache_folder
+from utils import config, generate_models
+from data_handler.DiskCacheHandler import BaseStreamDiskCacheMysqlHandler
 
 
 # 设置 MySQL 数据库连接
 db = MySQLDatabase(
     'binance_agg_trade',
-    user='root',
-    password='**REMOVED**',
-    host='**REMOVED**',
-    port=10003
+    user=config.mysql.user,
+    password=config.mysql.password,
+    host=config.mysql.host,
+    port=config.mysql.port
 )
 
 
@@ -32,7 +33,7 @@ class BaseAggTrade(Model):
         )
 
 
-models_agg_trades = generate_models(future_usdt_symbol_all, BaseAggTrade)
+models_agg_trades = generate_models(config.usdt_future_symbol_all, BaseAggTrade)
 
 
 class AggTradeHandler(BaseStreamDiskCacheMysqlHandler):

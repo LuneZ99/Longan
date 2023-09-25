@@ -1,6 +1,6 @@
 from typing import Any
 
-from .BaseHandler import BaseStreamDiskCacheHandler
+from data_handler.DiskCacheHandler import BaseStreamDiskCacheHandler
 
 
 class BookTickerHandler(BaseStreamDiskCacheHandler):
