@@ -24,10 +24,8 @@ class DotDict(dict):
     def __getattr__(self, item) -> Any:
         # needed for mypy checks
         # try to get the default attribute from Dict
-        try:
-            return self._getattr__(item) if item in self else getattr(super, item)
-        except AttributeError:
-            raise AttributeError(f'Cannot find {item} in class or super classes')
+        return self._getattr__(item) if item in self else getattr(super, item)
+
 
     def __setattr__(self, name: str, value) -> None:
         try:
@@ -56,7 +54,7 @@ class DotDict(dict):
 
 
 if __name__ == '__main__':
-    d = DotDict()
+    d = DotDict().from_yaml('config.yaml')
     d.a = 1
-    print(d.a)
-    print(d.b)
+    print(d.disk_cache_folder)
+

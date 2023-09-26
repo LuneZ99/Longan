@@ -42,12 +42,14 @@ class SymbolStreamMysqlHandler:
         self.on_kline_8h = KlineHandler(symbol, 'kline_8h')
         self.on_agg_trade = AggTradeHandler(symbol)
         self.on_book_ticker = BookTickerHandler(symbol)
+        self.on_depth20 = Depth20Handler(symbol)
 
     def on_close(self):
         self.on_agg_trade.on_close()
         self.on_kline_1m.on_close()
         self.on_kline_1h.on_close()
         self.on_kline_8h.on_close()
+        self.on_depth20.on_close()
 
 
 class BinanceFutureMD(BaseBinanceWSClient):
@@ -63,10 +65,9 @@ class BinanceFutureMD(BaseBinanceWSClient):
 
     def on_agg_trade(self, symbol: str, data: dict, rec_time: int):
         self.handlers[symbol].on_agg_trade.process_line(data, rec_time)
-        pass
 
     def on_depth20(self, symbol: str, data: dict, rec_time: int):
-        pass
+        self.handlers[symbol].on_depth20.process_line(data, rec_time)
 
     def on_force_order(self, symbol: str, data: dict, rec_time: int):
         pass
@@ -109,24 +110,11 @@ def md2sql_worker(
 
 if __name__ == '__main__':
 
+    from utils import config
+
     signal.signal(signal.SIGINT, signal_handler)
 
-    symbols = [f'{x}USDT'.lower() for x in [
-        '1000FLOKI', '1000LUNC', '1000PEPE', '1000SHIB', '1000XEC', '1INCH', 'AAVE', 'ACH', 'ADA', 'AGIX', 'AGLD',
-        'ALGO', 'ALICE', 'ALPHA', 'AMB', 'ANKR', 'ANT', 'APE', 'API3', 'APT', 'ARB', 'ARKM', 'ARPA', 'AR', 'ASTR',
-        'ATA', 'ATOM', 'AUDIO', 'AVAX', 'AXS', 'BAKE', 'BAL', 'BAND', 'BAT', 'BCH', 'BEL', 'BLUEBIRD', 'BLUR', 'BLZ',
-        'BNB', 'BNT', 'BNX', 'BTCDOM', 'BTC', 'C98', 'CELO', 'CELR', 'CFX', 'CHR', 'CHZ', 'CKB', 'COMBO', 'COMP',
-        'COTI', 'CRV', 'CTK', 'CTSI', 'CVX', 'CYBER', 'DAR', 'DASH', 'DEFI', 'DENT', 'DGB', 'DODOX', 'DOGE', 'DOT',
-        'DUSK', 'DYDX', 'EDU', 'EGLD', 'ENJ', 'ENS', 'ETC', 'ETH', 'FET', 'FIL', 'FLOW', 'FOOTBALL', 'FTM', 'FXS',
-        'GALA', 'GAL', 'GMT', 'GMX', 'GRT', 'GTC', 'HBAR', 'HFT', 'HIGH', 'HOOK', 'HOT', 'ICP', 'ICX', 'IDEX', 'ID',
-        'IMX', 'INJ', 'IOST', 'IOTA', 'IOTX', 'JASMY', 'JOE', 'KAVA', 'KEY', 'KLAY', 'KNC', 'KSM', 'LDO', 'LEVER',
-        'LINA', 'LINK', 'LITU', 'LPTU', 'LQTY', 'LRC', 'LTC', 'LUNA2', 'MAGIC', 'MAMA', 'MASK', 'MATIC', 'MAV',
-        'MDT', 'MINA', 'MKR', 'MTL', 'NEAR', 'NEO', 'NKN', 'NMR', 'OCEAN', 'OGN', 'OMG', 'ONE', 'ONT', 'OP', 'OXT',
-        'PENDLE', 'PEOPLE', 'PERP', 'PHB', 'QNT', 'QTUM', 'RAD', 'RDNT', 'REEF', 'REN', 'RLC', 'RNDR', 'ROSE',
-        'RSR', 'RUNE', 'RVN', 'SAND', 'SEI', 'SFP', 'SKL', 'SNX', 'SOL', 'SPELL', 'SSV', 'STG', 'STMX', 'STORJ', 'STX',
-        'SUI', 'SUSHI', 'SXP', 'THETA', 'TLM', 'TOMO', 'TRB', 'TRU', 'TRX', 'T', 'UMA', 'UNFI', 'UNI', 'VET', 'WAVES',
-        'WLD', 'WOO', 'XEM', 'XMR', 'XLM', 'XRP', 'XTZ', 'XVG', 'XVS', 'YFI', 'YGG', 'ZEC', 'ZEN', 'ZIL', 'ZRX'
-    ]]
+    symbols = config.usdt_future_symbol_all
 
     subscribe_list_all = [
         'kline_1m',
@@ -134,7 +122,7 @@ if __name__ == '__main__':
         'kline_8h',
         'aggTrade',
         'bookTicker',
-        # 'depth20'
+        'depth20'
     ]
 
     split_num = len(symbols) * len(subscribe_list_all) // 200 + 2
@@ -144,7 +132,9 @@ if __name__ == '__main__':
 
     processes = list()
     for i, symbols in enumerate(split_symbols):
-        p = multiprocessing.Process(target=md2sql_worker, args=(i, symbols, subscribe_list_all, 0))
+        p = multiprocessing.Process(
+            target=md2sql_worker, args=(i, symbols, subscribe_list_all, 0)
+        )
         p.daemon = True
         p.start()
         processes.append(p)

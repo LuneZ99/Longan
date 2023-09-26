@@ -168,8 +168,7 @@ class BaseBinanceWSClient:
         if message['delay'] > self.delay_warning_threshold:
             self.delay_warning_count += 1
 
-        if message[
-            'delay'] > self.delay_warning_threshold and time.time() - self.delay_warning_last > self.delay_warning_interval:
+        if message['delay'] > self.delay_warning_threshold and time.time() - self.delay_warning_last > self.delay_warning_interval:
             self.log(
                 WARN,
                 f"Receiving {message['stream']} delay too much, delay {message['delay']} ms. "
