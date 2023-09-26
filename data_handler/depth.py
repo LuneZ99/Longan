@@ -7,7 +7,7 @@ from data_handler.DiskCacheHandler import BaseStreamDiskCacheMysqlHandler
 
 # 设置 MySQL 数据库连接
 db = MySQLDatabase(
-    'binance_depth20',
+    'binance_depth',
     user=config.mysql.user,
     password=config.mysql.password,
     host=config.mysql.host,
@@ -21,7 +21,7 @@ cols_s = [f"sp{i},sv{i}" for i in range(1, 21)]
 
 class BaseDepth20(Model):
     orig_time = BigIntegerField(primary_key=True, null=False)
-    trade_Time = BigIntegerField(null=False)
+    trade_time = BigIntegerField(null=False)
 
     bp1 = FloatField(null=False)
     bv1 = FloatField(null=False)
@@ -122,21 +122,31 @@ class Depth20Handler(BaseStreamDiskCacheMysqlHandler):
     def __init__(self, symbol, event='depth', expire_time=180, flush_interval=120):
         super().__init__(symbol, event, expire_time, flush_interval)
         self.model = models_depth[self.symbol]
+        self.last_data = None
 
     def _process_line(self, data, rec_time) -> tuple[Any, dict]:
 
-        dic = dict(
+        dic_t = dict(
             orig_time=data['E'],
             trade_time=data['T']
         )
 
+        dic_d = dict()
+
         for i, pv in enumerate(data['b']):
-            dic[f"bp{i + 1}"] = pv[0]
-            dic[f"bv{i + 1}"] = pv[1]
+            dic_d[f"bp{i + 1}"] = pv[0]
+            dic_d[f"bv{i + 1}"] = pv[1]
 
         for i, pv in enumerate(data['a']):
-            dic[f"sp{i + 1}"] = pv[0]
-            dic[f"sv{i + 1}"] = pv[1]
+            dic_d[f"sp{i + 1}"] = pv[0]
+            dic_d[f"sv{i + 1}"] = pv[1]
 
-        return data['T'], dic
+        if dic_d == self.last_data:
+            return None, dict()
 
+        self.last_data = dic_d
+
+        return data['T'], {
+            **dic_t,
+            **dic_d
+        }

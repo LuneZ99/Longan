@@ -83,6 +83,10 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
 
     def process_line(self, data, rec_time):
         key, line = self._process_line(data, rec_time)
+
+        if line == dict():
+            return
+
         if key is None:
             self.dc.push(line, expire=self.expire_time)
         else:
@@ -98,8 +102,9 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
 
     def start_timer(self):
 
-        self.timer = threading.Timer(self._get_time_diff() + random.uniform(0, self.flush_interval),
-                                     self.run_periodically)
+        self.timer = threading.Timer(
+            self._get_time_diff() + random.uniform(0, self.flush_interval), self.run_periodically
+        )
         self.timer.start()
 
     def stop_timer(self):
