@@ -1,6 +1,10 @@
-from utils import config
 import websocket
 from time import time
+
+from tools.dot_dict import DotDict
+
+config = DotDict.from_yaml("config.yaml")
+
 
 if __name__ == '__main__':
     websocket.enableTrace(True)
@@ -10,7 +14,7 @@ if __name__ == '__main__':
         print((time() - float(message)) * 1000, "ms")
 
     ws = websocket.WebSocketApp(
-        "ws://localhost:8010",
+        config.litchi_md_url,
         on_message=on_message,
     )
 
