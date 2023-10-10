@@ -9,6 +9,7 @@ from binance_enum import *
 
 
 class BinanceAPIUtils:
+    symbol_all = []
 
     def __init__(self, flush_api_cache=False, flush_utils_cache=False):
         self.base_url = 'https://fapi.binance.com'
@@ -135,9 +136,9 @@ class BinanceAPIUtils:
         exchange_info = self.get_exchange_info(use_cache=False)
 
         for symbol_dic in exchange_info['symbols']:
-            self.symbol_info[symbol_dic['symbol']] = symbol_dic
-
-
+            if symbol_dic['contractType'] == 'PERPETUAL' and symbol_dic['quoteAsset'] != 'BUSD':
+                self.symbol_info[symbol_dic['symbol']] = symbol_dic
+                self.symbol_all.append(symbol_dic['symbol'])
 
     def get_depth(self):
         # API 深度信息
@@ -388,15 +389,16 @@ if __name__ == '__main__':
     s.get_server_time()
     # s.get_all_history_order()
     # s.get_balance()
-    # print(s.symbol_info['ETHUSDT'])
-    s.send_limit_order_v1(
-        symbol='ETHUSDT',
-        price=1600.00,
-        quantity=0.01,
-        order_side=OrderSide.BUY,
-        time_in_force=TimeInForce.GTD,
-        gtd_second=660,
-        prefix='test2',
-        # testnet=True
-    )
+    print(s.symbol_info['ETHUSDT'])
+    print(s.symbol_all)
+    # s.send_limit_order_v1(
+    #     symbol='ETHUSDT',
+    #     price=1600.00,
+    #     quantity=0.01,
+    #     order_side=OrderSide.BUY,
+    #     time_in_force=TimeInForce.GTD,
+    #     gtd_second=660,
+    #     prefix='test2',
+    #     # testnet=True
+    # )
 

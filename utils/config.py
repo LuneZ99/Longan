@@ -1,9 +1,13 @@
 from utils.dot_dict import DotDict
 
 
-config = DotDict.from_yaml('/mnt/0/lune/Longan/utils/config.yaml')
+class Config(DotDict):
+    future_symbols: list
+
+
+config = Config.from_yaml('/mnt/0/lune/Longan/utils/config.yaml')
 print(config.disk_cache_folder)
-config.usdt_future_symbol_all = [f'{x}USDT'.lower() for x in config.usdt_future_coins]
+config.future_symbols = [f'{x}'.lower() for x in config.future_symbols]
 
 
 if __name__ == '__main__':

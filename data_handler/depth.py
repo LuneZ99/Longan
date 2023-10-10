@@ -114,7 +114,7 @@ class BaseDepth20(Model):
         )
 
 
-models_depth = generate_models(config.usdt_future_symbol_all, BaseDepth20)
+models_depth = generate_models(config.future_symbols, BaseDepth20)
 
 
 class Depth20Handler(BaseStreamDiskCacheMysqlHandler):

@@ -12,7 +12,6 @@ from peewee import Model
 from data_handler.BaseHandler import BaseHandler
 from utils import logger_md, config
 
-
 cache_folder = config.disk_cache_folder
 
 
@@ -70,11 +69,14 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         cache_path = f"{cache_folder}/{symbol}@{event}"
         if not os.path.exists(cache_path):
             logger_md.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
-        self.dc = Cache(cache_path, timeout=0.1)
+        self.dc = Cache(cache_path, timeout=0.5)
         logger_md.log(DEBUG, f"Success load cache on {cache_folder}/{symbol}@{event}")
         self.cache_list = list()
         self.expire_time = expire_time
         self.flush_interval = flush_interval
+        self.avg_delay = 0
+        self.rec_count = 0
+        self.last_delay = 0
         self.start_timer()
 
     def on_close(self):
@@ -87,16 +89,30 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         if line == dict():
             return
 
+        if self.event == 'depth':
+            self.last_delay = line['orig_time'] - line['trade_time']
+        else:
+            self.last_delay = line['rec_time'] - line['event_time']
+
+        self.avg_delay = (self.avg_delay * self.rec_count + self.last_delay) / (self.rec_count + 1)
+        self.rec_count += 1
+
         if key is None:
             self.dc.push(line, expire=self.expire_time)
         else:
             self.dc.set(key, line, expire=self.expire_time)
+
         self.cache_list.append(line)
 
     def flush_to_sql(self):
         # with db.atomic():
         if len(self.cache_list) > 0:
-            logger_md.log(INFO, f"Flush {self.symbol}@{self.event} [{len(self.cache_list)}] to sql.")
+            logger_md.log(
+                INFO,
+                f"Flush {self.symbol:>13}@{self.event:<9} [{len(self.cache_list):>5}] to sql | "
+                f"avg delay {self.avg_delay:>4.0f} ms | "
+                f"last delay {self.last_delay:>4.0f} ms"
+            )
             self.model.insert_many(self.cache_list).execute()
             self.cache_list.clear()
 
