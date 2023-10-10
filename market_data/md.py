@@ -18,7 +18,9 @@ def split_list(lst, num_parts):
 
 
 def signal_handler(signum, frame):
+
     logger_md.log(WARN, "Close all workers.")
+
     for ii, pp in enumerate(multiprocessing.active_children()):
         # p.terminate()
         logger_md.log(WARN, f"Closing... subprocess {ii}")
@@ -29,7 +31,7 @@ def signal_handler(signum, frame):
     # clear_cache_folder()
 
     logger_md.log(WARN, f"Cache folder size {get_cache_folder_size()} M.")
-    time.sleep(5)
+    time.sleep(3)
 
     exit(0)
 
@@ -114,7 +116,7 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    symbols = config.usdt_future_symbol_all
+    symbols = config.future_symbols
 
     subscribe_list_all = [
         'kline_1m',
@@ -125,7 +127,7 @@ if __name__ == '__main__':
         'depth20'
     ]
 
-    split_num = len(symbols) * len(subscribe_list_all) // 200 + 2
+    split_num = len(symbols) * len(subscribe_list_all) // 100 + 1
     split_symbols = split_list(symbols, split_num)
 
     logger_md.log(INFO, f"Starting with {len(symbols)} symbols, split to {split_num} MD workers.")
@@ -133,7 +135,7 @@ if __name__ == '__main__':
     processes = list()
     for i, symbols in enumerate(split_symbols):
         p = multiprocessing.Process(
-            target=md2sql_worker, args=(i, symbols, subscribe_list_all, 0)
+            target=md2sql_worker, args=(i, symbols, subscribe_list_all, 0, config.proxie_url, False)
         )
         p.daemon = True
         p.start()

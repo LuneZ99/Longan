@@ -33,7 +33,7 @@ class BaseAggTrade(Model):
         )
 
 
-models_agg_trades = generate_models(config.usdt_future_symbol_all, BaseAggTrade)
+models_agg_trades = generate_models(config.future_symbols, BaseAggTrade)
 
 
 class AggTradeHandler(BaseStreamDiskCacheMysqlHandler):

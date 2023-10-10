@@ -57,13 +57,13 @@ class BaseBinanceWSClient:
         self.connect_time = None
         self.connect_count = 0
 
-        self.delay_warning_threshold = 500
+        self.delay_warning_threshold = 1000
         self.delay_warning_last = 0
-        self.delay_warning_interval = 30
+        self.delay_warning_interval = 60
         self.delay_warning_count = 0
 
     def log(self, level, msg):
-        self.logger.log(level, f"MD-{self.name}: {msg}")
+        self.logger.log(level, f"MD-{self.name:0>2}: {msg}")
 
     def subscribe(self, symbol: str, channel: str, log_interval: int = True):
 
@@ -171,9 +171,9 @@ class BaseBinanceWSClient:
         if message['delay'] > self.delay_warning_threshold and time.time() - self.delay_warning_last > self.delay_warning_interval:
             self.log(
                 WARN,
-                f"Receiving {message['stream']} delay too much, delay {message['delay']} ms. "
-                f"Total delay count {self.delay_warning_count}, "
-                f"{self.delay_warning_count / self.total_message_count:.2%} of all messages. "
+                f"Receiving {message['stream']} delay {message['delay']} ms. "
+                f"{self.delay_warning_count} delay / {self.total_message_count} messages "
+                f"({self.delay_warning_count / self.total_message_count:.2%})"
             )
             self.delay_warning_last = time.time()
 
