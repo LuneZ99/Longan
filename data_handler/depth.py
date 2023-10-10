@@ -134,12 +134,12 @@ class Depth20Handler(BaseStreamDiskCacheMysqlHandler):
         dic_d = dict()
 
         for i, pv in enumerate(data['b']):
-            dic_d[f"bp{i + 1}"] = pv[0]
-            dic_d[f"bv{i + 1}"] = pv[1]
+            dic_d[f"bp{i + 1}"] = float(pv[0])
+            dic_d[f"bv{i + 1}"] = float(pv[1])
 
         for i, pv in enumerate(data['a']):
-            dic_d[f"sp{i + 1}"] = pv[0]
-            dic_d[f"sv{i + 1}"] = pv[1]
+            dic_d[f"sp{i + 1}"] = float(pv[0])
+            dic_d[f"sv{i + 1}"] = float(pv[1])
 
         if dic_d == self.last_data:
             return None, dict()

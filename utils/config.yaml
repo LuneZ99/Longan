@@ -4,8 +4,8 @@ proxies:
 
 proxie_url: "http://127.0.0.1:7890"
 
-#disk_cache_folder: /mnt/0/tmp/binance_cache
-disk_cache_folder: /dev/shm/binance_cache
+disk_cache_folder: /mnt/0/tmp/binance_cache
+#disk_cache_folder: /dev/shm/binance_cache
 lmdb_cache_folder: /dev/shm/binance_lmdb
 
 # sql config
@@ -42,3 +42,5 @@ future_symbols: [
 ]
 
 kline_list: [ 'kline1m', 'kline1h', 'kline8h' ]
+
+litchi_md_url: "ws://localhost:8010"

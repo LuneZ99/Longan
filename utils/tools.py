@@ -2,7 +2,7 @@ from logging import WARN
 
 from peewee import Model
 
-from utils.logger import logger_md
+from utils import logger_md
 
 
 def generate_models(table_names, meta_type):

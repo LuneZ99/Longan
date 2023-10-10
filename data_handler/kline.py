@@ -59,20 +59,20 @@ class KlineHandler(BaseStreamDiskCacheMysqlHandler):
     def _process_line(self, data, rec_time) -> tuple[Any, dict]:
         if data['k']['x']:
             # todo: WARNING for rec_time > 1s
-            return f"{data['k']['T']}_{self.symbol}", dict(
+            return data['k']['T'], dict(
                 symbol=self.symbol,
                 rec_time=rec_time,
                 event_time=data['E'],
                 open_time=data['k']['t'],
                 close_time=data['k']['T'],
-                open=data['k']['o'],
-                high=data['k']['h'],
-                low=data['k']['l'],
-                close=data['k']['c'],
-                volume=data['k']['v'],
-                quote_volume=data['k']['q'],
+                open=float(data['k']['o']),
+                high=float(data['k']['h']),
+                low=float(data['k']['l']),
+                close=float(data['k']['c']),
+                volume=float(data['k']['v']),
+                quote_volume=float(data['k']['q']),
                 count=data['k']['n'],
-                taker_buy_volume=data['k']['V'],
-                taker_buy_quote_volume=data['k']['Q']
+                taker_buy_volume=float(data['k']['V']),
+                taker_buy_quote_volume=float(data['k']['Q'])
             )
 

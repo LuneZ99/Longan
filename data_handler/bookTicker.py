@@ -15,8 +15,8 @@ class BookTickerHandler(BaseStreamDiskCacheHandler):
             event_time=data['E'],
             transaction_time=data['T'],
 
-            best_bid_price=data['b'],
-            best_bid_qty=data['B'],
-            best_ask_price=data['a'],
-            best_ask_qty=data['A'],
+            best_bid_price=float(data['b']),
+            best_bid_qty=float(data['B']),
+            best_ask_price=float(data['a']),
+            best_ask_qty=float(data['A']),
         )

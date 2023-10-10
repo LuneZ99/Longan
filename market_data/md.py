@@ -17,23 +17,23 @@ def split_list(lst, num_parts):
     return result
 
 
-def signal_handler(signum, frame):
-
-    logger_md.log(WARN, "Close all workers.")
-
-    for ii, pp in enumerate(multiprocessing.active_children()):
-        # p.terminate()
-        logger_md.log(WARN, f"Closing... subprocess {ii}")
-        os.kill(pp.pid, signal.SIGINT)
-        pp.join()
-
-    # logger_md.log(WARN, "Clear cache folder.")
-    # clear_cache_folder()
-
-    logger_md.log(WARN, f"Cache folder size {get_cache_folder_size()} M.")
-    time.sleep(3)
-
-    exit(0)
+# def signal_handler(signum, frame):
+#
+#     logger_md.log(WARN, "Close all workers.")
+#
+#     for ii, pp in enumerate(multiprocessing.active_children()):
+#         # p.terminate()
+#         logger_md.log(WARN, f"Closing... subprocess {ii}")
+#         os.kill(pp.pid, signal.SIGINT)
+#         pp.join()
+#
+#     # logger_md.log(WARN, "Clear cache folder.")
+#     # clear_cache_folder()
+#
+#     logger_md.log(WARN, f"Cache folder size {get_cache_folder_size()} M.")
+#     time.sleep(3)
+#
+#     exit(0)
 
 
 class SymbolStreamMysqlHandler:
@@ -113,8 +113,12 @@ def md2sql_worker(
 if __name__ == '__main__':
 
     from utils import config
+    import rel
 
-    signal.signal(signal.SIGINT, signal_handler)
+    # signal.signal(signal.SIGINT, signal_handler)
+
+    rel.signal(2, rel.abort)  # Keyboard Interrupt
+    rel.dispatch()
 
     symbols = config.future_symbols
 
@@ -143,3 +147,4 @@ if __name__ == '__main__':
 
     while True:
         time.sleep(1)
+

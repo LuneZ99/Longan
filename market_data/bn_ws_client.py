@@ -12,6 +12,9 @@ import websocket
 from utils import config, logger_md
 
 
+# litchi_md = websocket.create_connection(config.litchi_md_url)
+
+
 def format_dict(default_dict):
     if isinstance(default_dict, defaultdict):
         return {k: format_dict(v) for k, v in default_dict.items()}
@@ -161,6 +164,8 @@ class BaseBinanceWSClient:
         event = stream_list[1]
         data: dict = message['data']
 
+        self.log_count[symbol][event] += 1
+
         if self.log_interval[symbol][event] > 0 and \
                 self.log_count[symbol][event] % self.log_interval[symbol][event] == 0:
             self.log(INFO, message)
@@ -177,8 +182,14 @@ class BaseBinanceWSClient:
             )
             self.delay_warning_last = time.time()
 
-        self.callbacks[symbol][event](symbol, data, rec_time)
-        self.log_count[symbol][event] += 1
+        processed_data = self.callbacks[symbol][event](symbol, data, rec_time)
+
+        # send to md
+        # processed_msg = {
+        #     "data": processed_data,
+        # }
+        # global litchi_md
+        # litchi_md.send(str(processed_msg))
 
     @staticmethod
     def on_missing(symbol: str, name: str, data: dict, rec_time: int):

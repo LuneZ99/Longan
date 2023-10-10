@@ -27,8 +27,7 @@ class BaseStreamMysqlHandler(BaseHandler):
         pass
 
     def process_line(self, data, rec_time):
-        if line := self._process_line(data, rec_time):
-            self.model.create(**line)
+        raise NotImplementedError
 
     def _process_line(self, data, rec_time) -> dict:
         raise NotImplementedError
