@@ -42,7 +42,7 @@ class BaseStreamDiskCacheHandler(BaseHandler):
         cache_path = f"{cache_folder}/{symbol}@{event}"
         if not os.path.exists(cache_path):
             logger_md.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
-        self.dc = Cache(cache_path, timeout=0.1)
+        self.dc = Cache(cache_path, timeout=0.5)
         self.expire_time = expire_time
 
     def on_close(self):
@@ -89,20 +89,15 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         if line == dict():
             return
 
-        if self.event == 'depth':
-            self.last_delay = line['orig_time'] - line['trade_time']
-        else:
-            self.last_delay = line['rec_time'] - line['event_time']
-
+        self.last_delay = line['orig_time'] - line['trade_time'] \
+            if self.event == 'depth' else line['rec_time'] - line['event_time']
         self.avg_delay = (self.avg_delay * self.rec_count + self.last_delay) / (self.rec_count + 1)
         self.rec_count += 1
 
-        if key is None:
-            self.dc.push(line, expire=self.expire_time)
-        else:
-            self.dc.set(key, line, expire=self.expire_time)
-
+        lst = list(line.values())
+        self.dc.push(lst, expire=self.expire_time) if key is None else self.dc.set(key, lst, expire=self.expire_time)
         self.cache_list.append(line)
+        self._process_line_callback()
 
     def flush_to_sql(self):
         # with db.atomic():
@@ -124,7 +119,7 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         self.timer.start()
 
     def stop_timer(self):
-        if self.timer:
+        if self.timer is not None:
             self.timer.cancel()
 
     def run_periodically(self):
@@ -140,6 +135,8 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         # 计算下一次运行的时间
         now = datetime.now()
         next_run_time = now + timedelta(seconds=self.flush_interval)
+
+        # 避开分钟线更新
         if next_run_time.second <= 3 or next_run_time.second >= 58:
             next_run_time += timedelta(seconds=5)
 
@@ -147,3 +144,6 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
 
     def _process_line(self, data, rec_time) -> tuple[Any, dict]:
         raise NotImplementedError
+
+    def _process_line_callback(self):
+        pass
