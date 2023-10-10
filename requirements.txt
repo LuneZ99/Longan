@@ -7,3 +7,6 @@ websocket-client~=1.6.2
 diskcache~=5.6.1
 httpx~=0.24.1
 retry~=0.9.2
+pydantic~=2.3.0
+websockets~=11.0.3
+rel~=0.4.9
