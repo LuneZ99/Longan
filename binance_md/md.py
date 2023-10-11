@@ -139,7 +139,7 @@ if __name__ == '__main__':
     processes = list()
     for i, symbols in enumerate(split_symbols):
         p = multiprocessing.Process(
-            target=md2sql_worker, args=(i, symbols, subscribe_list_all, 0, config.proxie_url, False)
+            target=md2sql_worker, args=(i, symbols, subscribe_list_all, 0, config.proxy_url, False)
         )
         p.daemon = True
         p.start()

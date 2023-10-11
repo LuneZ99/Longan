@@ -4,6 +4,8 @@ from tools.dot_dict import DotDict
 class Config(DotDict):
     future_symbols: list
     disk_cache_folder: str
+    proxy_url: str
+    push_to_litchi: bool
 
 
 config = Config.from_yaml('utils/config.yaml')

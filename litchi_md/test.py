@@ -8,11 +8,20 @@ config = DotDict.from_yaml("config.yaml")
 websocket.enableTrace(True)
 
 # print(config.litchi_md_url)
+# litchi_md = websocket.create_connection("ws://localhost:8011")
 
-litchi_md = websocket.create_connection(config.litchi_md_url)
+
+def on_open(ws):
+    ws.send("sender")
 
 
-for i in range(60):
+litchi_md = websocket.WebSocketApp(
+    config.litchi_md_url,
+    on_open=on_open,
+)
+
+
+for i in range(5):
     litchi_md.send(str(time()))
     sleep(0.1)
 
