@@ -21,20 +21,32 @@ console_handler.setFormatter(formatter)
 logger_litchi_md.addHandler(console_handler)
 
 
-connected = set()
+senders = set()
+receivers = set()
 
 
 async def broadcast_handle(websocket, path):
-    # Register.
-    connected.add(websocket)
+    # First message should be the type of the client.
+    client_type = await websocket.recv()
+    if client_type == 'sender':
+        senders.add(websocket)
+    elif client_type == 'receiver':
+        receivers.add(websocket)
+    else:
+        print(f"Unknown client type: {client_type}")
+        return
 
     try:
         async for message in websocket:
-            # Broadcast to all connected clients.
-            await asyncio.gather(*[ws.send(message) for ws in connected if ws != websocket])
+            # If the message is from a sender, broadcast it to all receivers.
+            if websocket in senders:
+                await asyncio.wait([ws.send(message) for ws in receivers])
     finally:
         # Unregister.
-        connected.remove(websocket)
+        if websocket in senders:
+            senders.remove(websocket)
+        if websocket in receivers:
+            receivers.remove(websocket)
 
 
 md_server = websockets.serve(

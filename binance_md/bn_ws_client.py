@@ -12,8 +12,8 @@ from diskcache import Cache
 
 from binance_md.utils import config, logger_md
 
-
-# litchi_md = websocket.create_connection(config.litchi_md_url)
+if config.push_to_litchi:
+    litchi_md = websocket.create_connection(config.litchi_md_url)
 
 
 def format_dict(default_dict):
@@ -156,6 +156,9 @@ class BaseBinanceWSClient:
         self.log(INFO, f"Connection started.")
 
     def _on_close(self, ws, code, message):
+        if config.push_to_litchi:
+            global litchi_md
+            litchi_md.close()
         self.log(WARN, "Websocket Connection closing ...")
         for handler in self.handlers.values():
             handler.on_close()
