@@ -67,7 +67,7 @@ async def broadcast_handle(websocket, path):
             # If the message is from a sender, broadcast it to all receivers.
             if websocket in senders and msg[MsgKey.type] == MsgType.market_data and len(receivers) > 0:
                 send_msg = json.dumps(msg)
-                await asyncio.wait([ws.send(send_msg) for ws in receivers])
+                await asyncio.gather(*[ws.send(send_msg) for ws in receivers])
 
     finally:
         # Unregister.
