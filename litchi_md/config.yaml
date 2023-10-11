@@ -1,3 +1,4 @@
 litchi_md_ip: localhost
 litchi_md_port: 8010
 litchi_md_url: "ws://localhost:8010"
+litchi_md_log: false
