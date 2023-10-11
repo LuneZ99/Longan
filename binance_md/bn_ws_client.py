@@ -134,6 +134,8 @@ class BaseBinanceWSClient:
                     ws.run_forever()
                     ws.close()
                     self.log(ERROR, f"Websocket disconnected, retrying ...")
+                    # self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
+                    time.sleep(3)
         else:
             for proxy in itertools.cycle(self.proxy):
                 if not self.interrupt_cache['flag']:
@@ -145,7 +147,8 @@ class BaseBinanceWSClient:
                     )
                     ws.close()
                     self.log(ERROR, f"Websocket disconnected, retrying ...")
-                    self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
+                    # self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
+                    time.sleep(3)
 
     def _on_open(self, ws):
         self.connect_time = datetime.now()

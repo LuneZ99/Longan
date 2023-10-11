@@ -10,7 +10,7 @@ config = DotDict.from_yaml("config.yaml")
 
 logger_litchi_md = logging.getLogger('logger_litchi_md')
 logger_litchi_md.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
 
 file_handler = logging.FileHandler("litchi_md.log")
 file_handler.setFormatter(formatter)
