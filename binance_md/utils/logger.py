@@ -8,7 +8,7 @@ class BinanceSyncLogger:
         self.logger.setLevel(logging.DEBUG)
 
         file_handler = logging.FileHandler(log_file)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
 
