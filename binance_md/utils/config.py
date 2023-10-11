@@ -1,12 +1,13 @@
-from utils.dot_dict import DotDict
+from tools.dot_dict import DotDict
 
 
 class Config(DotDict):
     future_symbols: list
+    disk_cache_folder: str
 
 
-config = Config.from_yaml('/mnt/0/lune/Longan/utils/config.yaml')
-print(config.disk_cache_folder)
+config = Config.from_yaml('utils/config.yaml')
+# print(config.disk_cache_folder)
 config.future_symbols = [f'{x}'.lower() for x in config.future_symbols]
 
 

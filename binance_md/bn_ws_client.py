@@ -8,8 +8,9 @@ from pprint import pformat
 from typing import Callable
 
 import websocket
+from diskcache import Cache
 
-from utils import config, logger_md
+from binance_md.utils import config, logger_md
 
 
 # litchi_md = websocket.create_connection(config.litchi_md_url)
@@ -64,6 +65,9 @@ class BaseBinanceWSClient:
         self.delay_warning_last = 0
         self.delay_warning_interval = 60
         self.delay_warning_count = 0
+
+        self.interrupt_cache = Cache("/dev/shm/binance_md_interrupt")
+        self.interrupt_cache['flag'] = False
 
     def log(self, level, msg):
         self.logger.log(level, f"MD-{self.name:0>2}: {msg}")
@@ -126,20 +130,22 @@ class BaseBinanceWSClient:
 
         if self.proxy is None:
             while True:
-                ws.run_forever()
-                self.log(ERROR, f"Websocket disconnected, retrying ...")
+                if not self.interrupt_cache['flag']:
+                    ws.run_forever()
+                    ws.close()
+                    self.log(ERROR, f"Websocket disconnected, retrying ...")
         else:
             for proxy in itertools.cycle(self.proxy):
-                self.log(INFO, f"Using proxy: {proxy}")
-                ws.run_forever(
-                    http_proxy_host=proxy[1],
-                    http_proxy_port=proxy[2],
-                    proxy_type=proxy[0]
-                )
-                ws.close()
-                self.log(ERROR, f"Websocket disconnected, retrying ...")
-                self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
-                time.sleep(10)
+                if not self.interrupt_cache['flag']:
+                    self.log(INFO, f"Using proxy: {proxy}")
+                    ws.run_forever(
+                        http_proxy_host=proxy[1],
+                        http_proxy_port=proxy[2],
+                        proxy_type=proxy[0]
+                    )
+                    ws.close()
+                    self.log(ERROR, f"Websocket disconnected, retrying ...")
+                    self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
 
     def _on_open(self, ws):
         self.connect_time = datetime.now()
@@ -173,7 +179,8 @@ class BaseBinanceWSClient:
         if message['delay'] > self.delay_warning_threshold:
             self.delay_warning_count += 1
 
-        if message['delay'] > self.delay_warning_threshold and time.time() - self.delay_warning_last > self.delay_warning_interval:
+        if message['delay'] > self.delay_warning_threshold and \
+                time.time() - self.delay_warning_last > self.delay_warning_interval:
             self.log(
                 WARN,
                 f"Receiving {message['stream']} delay {message['delay']} ms. "

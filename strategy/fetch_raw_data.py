@@ -1,6 +1,6 @@
 import pandas as pd
 
-from data_handler import *
+from binance_md.data_handler import *
 
 from datetime import datetime, timedelta
 
