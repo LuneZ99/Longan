@@ -1,9 +1,9 @@
 from typing import Any
 
 from peewee import *
-from utils import config, generate_models
-from data_handler.DiskCacheHandler import BaseStreamDiskCacheMysqlHandler
 
+from binance_md.data_handler.DiskCacheHandler import BaseStreamDiskCacheMysqlHandler
+from binance_md.utils import config, generate_models
 
 # 设置 MySQL 数据库连接
 db = MySQLDatabase(

@@ -29,4 +29,4 @@ class BinanceSyncLogger:
             self.logger.removeHandler(handler)
 
 
-logger_md = BinanceSyncLogger("log/md.log")
+

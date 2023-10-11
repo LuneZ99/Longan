@@ -2,11 +2,13 @@ import multiprocessing
 import os
 import signal
 import time
-from logging import WARN, INFO
+from logging import INFO, WARNING
 
-from market_data.bn_ws_client import BaseBinanceWSClient
-from utils import logger_md
-from data_handler import *
+from diskcache import Cache
+
+from binance_md.bn_ws_client import BaseBinanceWSClient
+from binance_md.data_handler import *
+from binance_md.utils import logger_md
 
 
 def split_list(lst, num_parts):
@@ -17,23 +19,25 @@ def split_list(lst, num_parts):
     return result
 
 
-# def signal_handler(signum, frame):
-#
-#     logger_md.log(WARN, "Close all workers.")
-#
-#     for ii, pp in enumerate(multiprocessing.active_children()):
-#         # p.terminate()
-#         logger_md.log(WARN, f"Closing... subprocess {ii}")
-#         os.kill(pp.pid, signal.SIGINT)
-#         pp.join()
-#
-#     # logger_md.log(WARN, "Clear cache folder.")
-#     # clear_cache_folder()
-#
-#     logger_md.log(WARN, f"Cache folder size {get_cache_folder_size()} M.")
-#     time.sleep(3)
-#
-#     exit(0)
+def signal_handler(signum, frame):
+    logger_md.log(WARNING, "Close all workers.")
+
+    interrupt_cache = Cache("/dev/shm/binance_md_interrupt")
+    interrupt_cache['flag'] = True
+
+    for ii, pp in enumerate(multiprocessing.active_children()):
+        # p.terminate()
+        logger_md.log(WARNING, f"Closing... subprocess {ii}")
+        os.kill(pp.pid, signal.SIGINT)
+        pp.join()
+
+    # logger_md.log(WARN, "Clear cache folder.")
+    # clear_cache_folder()
+
+    logger_md.log(WARNING, f"Cache folder size {get_cache_folder_size()} M.")
+    time.sleep(10)
+
+    exit(0)
 
 
 class SymbolStreamMysqlHandler:
@@ -112,13 +116,9 @@ def md2sql_worker(
 
 if __name__ == '__main__':
 
-    from utils import config
-    import rel
+    from binance_md.utils import config
 
-    # signal.signal(signal.SIGINT, signal_handler)
-
-    rel.signal(2, rel.abort)  # Keyboard Interrupt
-    rel.dispatch()
+    signal.signal(signal.SIGINT, signal_handler)
 
     symbols = config.future_symbols
 
@@ -147,4 +147,3 @@ if __name__ == '__main__':
 
     while True:
         time.sleep(1)
-

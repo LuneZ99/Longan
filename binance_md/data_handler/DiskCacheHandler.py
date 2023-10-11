@@ -9,8 +9,8 @@ from typing import Any
 from diskcache import Cache
 from peewee import Model
 
-from data_handler.BaseHandler import BaseHandler
-from utils import logger_md, config
+from binance_md.data_handler.BaseHandler import BaseHandler
+from binance_md.utils import logger_md, config
 
 cache_folder = config.disk_cache_folder
 
@@ -25,9 +25,7 @@ def get_cache_folder_size():
         for file in files:
             file_path = os.path.join(path, file)
             total_size += os.path.getsize(file_path)
-
-    # MB
-    return round(total_size / 1024 / 1024, 2)
+    return round(total_size / 1024 / 1024, 2)  # MB
 
 
 def get_disk_cache(symbol, event):
