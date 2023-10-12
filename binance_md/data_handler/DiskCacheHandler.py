@@ -48,10 +48,12 @@ class BaseStreamDiskCacheHandler(BaseHandler):
 
     def process_line(self, data, rec_time):
         key, line = self._process_line(data, rec_time)
+        lst = list(line.values())
         if key is None:
-            self.dc.push(line, expire=self.expire_time)
+            self.dc.push(lst, expire=self.expire_time)
         else:
-            self.dc.set(key, line, expire=self.expire_time)
+            self.dc.set(key, lst, expire=self.expire_time)
+        return lst
 
     def _process_line(self, data, rec_time) -> tuple[str, dict]:
         raise NotImplementedError
@@ -93,9 +95,16 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         self.rec_count += 1
 
         lst = list(line.values())
+
+        # monkey patch for k-line data, drop the symbol column when white to cache.
+        if isinstance(lst[0], str):
+            lst = lst[1:]
+
         self.dc.push(lst, expire=self.expire_time) if key is None else self.dc.set(key, lst, expire=self.expire_time)
         self.cache_list.append(line)
         self._process_line_callback()
+
+        return lst
 
     def flush_to_sql(self):
         # with db.atomic():

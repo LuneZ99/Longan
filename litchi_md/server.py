@@ -11,7 +11,7 @@ config = DotDict.from_yaml("config.yaml")
 
 if config.litchi_md_log:
     logger_litchi_md = logging.getLogger('logger_litchi_md')
-    logger_litchi_md.setLevel(logging.DEBUG)
+    logger_litchi_md.setLevel(logging.WARNING)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
 
     file_handler = logging.FileHandler("litchi_md.log")
@@ -44,29 +44,21 @@ async def broadcast_handle(websocket, path):
     try:
         async for msg in websocket:
 
-            if msg[0] != '{':
-                continue
+            msg_type = msg[0]
 
-            try:
-                msg = json.loads(msg)
-            except ValueError:
-                if logger_litchi_md:
-                    logger_litchi_md.warning(f"Unable to parse: {msg}")
-                continue
-
-            # register a user
-            if msg[MsgKey.type] == MsgType.register:
-                if msg[MsgKey.data] == RegisterType.sender:
+            if msg_type == MsgType.register:
+                data = msg[1:]
+                if data == RegisterType.sender:
                     senders.add(websocket)
-                elif msg[MsgKey.data] == RegisterType.receiver:
+                elif data == RegisterType.receiver:
                     receivers.add(websocket)
                 else:
                     if logger_litchi_md:
                         logger_litchi_md.warning(f"Unknown client type: {msg}")
 
             # If the message is from a sender, broadcast it to all receivers.
-            if websocket in senders and msg[MsgKey.type] == MsgType.market_data and len(receivers) > 0:
-                send_msg = json.dumps(msg)
+            if websocket in senders and msg_type == MsgType.broadcast and len(receivers) > 0:
+                send_msg = msg[1:]
                 await asyncio.gather(*[ws.send(send_msg) for ws in receivers])
 
     finally:

@@ -8,19 +8,21 @@ config = DotDict.from_yaml("config.yaml")
 if __name__ == '__main__':
     # websocket.enableTrace(True)
 
+    delay_ls = []
+
     def on_open(ws):
-        ws.send(json.dumps(
-            {
-                MsgKey.type: MsgType.register,
-                MsgKey.data: RegisterType.receiver
-            }
-        ))
+        ws.send(f"{MsgType.register}{RegisterType.receiver}")
 
 
     def on_message(ws, msg):
-        msg = json.loads(msg)
 
-        print((time() - float(msg[MsgKey.data]['time'])) * 1000, "ms")
+        msg = json.loads(msg)
+        # print(msg)
+        # print(msg['time'])
+        delay = (time() - float(msg['time'])) * 1000
+        delay_ls.append(delay)
+
+        print(f"{delay:.4f} ms - avg {sum(delay_ls) / len(delay_ls):.4f} ms")
 
 
     ws = websocket.WebSocketApp(

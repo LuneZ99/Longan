@@ -70,26 +70,26 @@ class BinanceFutureMD(BaseBinanceWSClient):
         }
 
     def on_agg_trade(self, symbol: str, data: dict, rec_time: int):
-        self.handlers[symbol].on_agg_trade.process_line(data, rec_time)
+        return self.handlers[symbol].on_agg_trade.process_line(data, rec_time)
 
     def on_depth20(self, symbol: str, data: dict, rec_time: int):
-        self.handlers[symbol].on_depth20.process_line(data, rec_time)
+        return self.handlers[symbol].on_depth20.process_line(data, rec_time)
 
     def on_force_order(self, symbol: str, data: dict, rec_time: int):
         pass
 
     def on_kline_1m(self, symbol: str, data: dict, rec_time: int):
-        self.handlers[symbol].on_kline_1m.process_line(data, rec_time)
+        return self.handlers[symbol].on_kline_1m.process_line(data, rec_time)
 
     def on_kline_8h(self, symbol: str, data: dict, rec_time: int):
-        self.handlers[symbol].on_kline_8h.process_line(data, rec_time)
+        return self.handlers[symbol].on_kline_8h.process_line(data, rec_time)
 
     def on_kline_1h(self, symbol: str, data: dict, rec_time: int):
-        self.handlers[symbol].on_kline_1h.process_line(data, rec_time)
+        return self.handlers[symbol].on_kline_1h.process_line(data, rec_time)
 
     def on_book_ticker(self, symbol: str, data: dict, rec_time: int):
         # save all bookTicker is useless.
-        self.handlers[symbol].on_book_ticker.process_line(data, rec_time)
+        return self.handlers[symbol].on_book_ticker.process_line(data, rec_time)
         pass
 
     def on_close(self, ws, code, message):
