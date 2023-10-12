@@ -74,3 +74,5 @@ class KlineHandler(BaseStreamDiskCacheMysqlHandler):
                 taker_buy_volume=float(data['k']['V']),
                 taker_buy_quote_volume=float(data['k']['Q'])
             )
+        else:
+            return None, dict()
