@@ -21,8 +21,12 @@ class BinanceAPIUtils:
 
         self.client = httpx.Client(proxies=proxies)
 
-        self.api_key = "**REMOVED**"
-        self.api_secret = "**REMOVED**"
+        # example use
+        # self.api_key = "Gy4D9ha8BGOwu4dMNhBMquZPimmis9m3qQChZiUIhSY6Zdt4dpKV41KvMEgVjP7i"
+        # self.api_secret = "Yo5xehT997NqS8yzSvelLS1Jl59bSrJbzLuY4YX4OkQ2UbmgNj2QLXVPHk1oAvfW"
+
+        self.api_key = ...
+        self.api_secret = ...
 
         self.headers = {
             "X-MBX-APIKEY": self.api_key
