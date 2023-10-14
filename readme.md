@@ -39,9 +39,13 @@ Under development
 ### binance websocket market data
 
 - [x] depth20
+- [x] kline
+- [x] aggTrade
+- [x] bookTicker
 - [x] marketPrice
 - [x] use config.yaml
-- [ ] support for remote forwarding
+- [x] use multiprocessing
+- [ ] support for remote server forwarding
 - [ ] performance optimization
 
 ### local websocket market data
@@ -50,8 +54,9 @@ Under development
 - [ ] trade data
 - [ ] Rewriting with golang (due to performance issues)
 
-### binance rest trader
+### binance restful trader
 
+- [x] auth
 - [x] limit order
 - [ ] market order
 - [ ] account / balance management
