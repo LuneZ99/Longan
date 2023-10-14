@@ -14,8 +14,6 @@ from binance_md.utils import config, logger_md
 from tools import *
 
 
-
-
 def format_dict(default_dict):
     if isinstance(default_dict, defaultdict):
         return {k: format_dict(v) for k, v in default_dict.items()}
@@ -78,9 +76,6 @@ class BaseBinanceWSClient:
                 self.log(WARN, "ConnectionRefusedError, is litchi_md server running?")
                 self.litchi_md = None
 
-    def log(self, level, msg):
-        self.logger.log(level, f"MD-{self.name:0>2}: {msg}")
-
     def subscribe(self, symbol: str, channel: str, log_interval: int = True):
 
         """
@@ -102,24 +97,6 @@ class BaseBinanceWSClient:
         if self.subscribe_count >= 200:
             self.log(ERROR, f"Subscribed {symbol} failed because {self.subscribe_count} is larger than 200")
             raise ValueError(f"Subscribed {symbol} failed because {self.subscribe_count} is larger than 200")
-
-    def _get_callbacks(self, channel):
-
-        converted_string = ""
-
-        if "_" in channel:
-            # 输入为下划线格式的字符串
-            converted_string = "on_" + channel
-        else:
-            # 输入为驼峰格式的字符串
-            for i, char in enumerate(channel):
-                if i > 0 and char.isupper():
-                    converted_string += "_"
-                converted_string += char.lower()
-
-            converted_string = "on_" + converted_string
-
-        return self.__getattribute__(converted_string)
 
     def run(self):
 
@@ -164,14 +141,6 @@ class BaseBinanceWSClient:
         self.connect_count += 1
         self.log(INFO, f"Connection started.")
 
-    def _on_close(self, ws, code, message):
-        if config.push_to_litchi:
-            global litchi_md
-            litchi_md.close()
-        self.log(WARN, "Websocket Connection closing ...")
-        for handler in self.handlers.values():
-            handler.on_close()
-
     def _on_message(self, ws, message):
 
         self.total_message_count += 1
@@ -207,17 +176,28 @@ class BaseBinanceWSClient:
         processed_data = self.callbacks[symbol][event](symbol, data, rec_time)
 
         # send to md
-        processed_msg = {
-            "symbol": symbol,
-            "event": event,
-            "rec_time": rec_time,
-            "data": processed_data,
-        }
         if self.litchi_md is not None:
             try:
-                self.litchi_md.send(f"{MsgType.broadcast}{processed_msg}")
+                if event in config.event_push_to_litchi_md:
+                    processed_msg = {
+                        "symbol": symbol,
+                        "event": event,
+                        "rec_time": rec_time,
+                        "data": processed_data,
+                    }
+                    self.litchi_md.send(f"{MsgType.broadcast}{json.dumps(processed_msg)}")
             except ConnectionError:
                 self.log(WARN, "Push to litchi_md ConnectionError, is litchi_md server running?")
+                self.litchi_md = websocket.create_connection(config.litchi_md_url)
+                self.litchi_md.send(f"{MsgType.register}{RegisterType.sender}")
+
+    def _on_close(self, ws, code, message):
+
+        self.log(WARN, "Websocket Connection closing ...")
+        for handler in self.handlers.values():
+            handler.on_close()
+        if self.litchi_md is not None:
+            self.litchi_md.close()
 
     @staticmethod
     def on_missing(symbol: str, name: str, data: dict, rec_time: int):
@@ -240,3 +220,24 @@ class BaseBinanceWSClient:
 
     def on_close(self, ws, code, message):
         pass
+
+    def log(self, level, msg):
+        self.logger.log(level, f"MD-{self.name:0>2}: {msg}")
+
+    def _get_callbacks(self, channel):
+
+        converted_string = ""
+
+        if "_" in channel:
+            # 输入为下划线格式的字符串
+            converted_string = "on_" + channel
+        else:
+            # 输入为驼峰格式的字符串
+            for i, char in enumerate(channel):
+                if i > 0 and char.isupper():
+                    converted_string += "_"
+                converted_string += char.lower()
+
+            converted_string = "on_" + converted_string
+
+        return self.__getattribute__(converted_string)
