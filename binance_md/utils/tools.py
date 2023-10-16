@@ -13,5 +13,9 @@ def generate_models(table_names, meta_type):
         }
         model: Model | meta_type | type = type(model_name, (meta_type,), model_attrs)
         models[table_name] = model
+        # 确保连接到数据库
+        # model._meta.database.connect()
+        # 如果表不存在，创建它
+        model.create_table(safe=True)
 
     return models

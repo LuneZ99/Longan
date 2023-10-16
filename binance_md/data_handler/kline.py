@@ -37,6 +37,8 @@ class BaseKline(Model):
     taker_buy_volume = FloatField(null=False)
     taker_buy_quote_volume = FloatField(null=False)
 
+    finish = BooleanField(null=False)
+
     class Meta:
         database = db
         indexes = (
@@ -56,23 +58,21 @@ class KlineHandler(BaseStreamDiskCacheMysqlHandler):
         self.model = models_kline[self.event.replace("_", "")]
 
     def _process_line(self, data, rec_time) -> tuple[Any, dict]:
-        if data['k']['x']:
-            # todo: WARNING for rec_time > 1s
-            return data['k']['T'], dict(
-                symbol=self.symbol,
-                rec_time=rec_time,
-                event_time=data['E'],
-                open_time=data['k']['t'],
-                close_time=data['k']['T'],
-                open=float(data['k']['o']),
-                high=float(data['k']['h']),
-                low=float(data['k']['l']),
-                close=float(data['k']['c']),
-                volume=float(data['k']['v']),
-                quote_volume=float(data['k']['q']),
-                count=data['k']['n'],
-                taker_buy_volume=float(data['k']['V']),
-                taker_buy_quote_volume=float(data['k']['Q'])
-            )
-        else:
-            return None, dict()
+
+        return data['k']['t'], dict(
+            symbol=self.symbol,
+            rec_time=rec_time,
+            event_time=data['E'],
+            open_time=data['k']['t'],
+            close_time=data['k']['T'],
+            open=float(data['k']['o']),
+            high=float(data['k']['h']),
+            low=float(data['k']['l']),
+            close=float(data['k']['c']),
+            volume=float(data['k']['v']),
+            quote_volume=float(data['k']['q']),
+            count=data['k']['n'],
+            taker_buy_volume=float(data['k']['V']),
+            taker_buy_quote_volume=float(data['k']['Q']),
+            finish=data['k']['x']
+        )

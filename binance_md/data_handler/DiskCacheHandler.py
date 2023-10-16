@@ -96,12 +96,16 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
 
         lst = list(line.values())
 
-        # monkey patch for k-line data, drop the symbol column when white to cache.
-        if isinstance(lst[0], str):
+        if self.event.startswith('kline'):
+            # monkey patch for k-line data, drop the symbol column when white to cache and flush data
             lst = lst[1:]
+            self.dc.set(key, lst, expire=self.expire_time)
+            if line['finish']:
+                self.cache_list.append(line)
+        else:
+            self.dc.set(key, lst, expire=self.expire_time)
+            self.cache_list.append(line)
 
-        self.dc.push(lst, expire=self.expire_time) if key is None else self.dc.set(key, lst, expire=self.expire_time)
-        self.cache_list.append(line)
         self._process_line_callback()
 
         return lst
