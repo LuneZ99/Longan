@@ -51,7 +51,7 @@ models_kline: dict[str, BaseKline] = generate_models(kline_list, BaseKline)
 
 
 class KlineHandler(BaseStreamDiskCacheMysqlHandler):
-    # cross-section KLine in cache and sql
+    # cross-section KLine in and sql
 
     def __init__(self, symbol, event, expire_time=32 * 24 * 60 * 60, flush_interval=120):
         super().__init__(symbol, event, expire_time, flush_interval)
