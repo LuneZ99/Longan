@@ -7,7 +7,22 @@ import httpx
 from diskcache import Cache
 from tools import *
 
-from binance_td.utils import config, logger_td
+from binance_td.utils import config
+import logging
+
+
+logger = logging.getLogger('logger_td')
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
+
+file_handler = logging.FileHandler("td.log")
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+
 
 
 class BinanceAPIUtils:
@@ -43,7 +58,7 @@ class BinanceAPIUtils:
             self.cache['order_all'] = dict()
             self.last_order_id = 1_000_000
 
-        print(self.cache['order_all'])
+        # print(self.cache['order_all'])
 
         self.symbol_info = dict()
         self.init_exchange_info()
@@ -90,7 +105,7 @@ class BinanceAPIUtils:
             self.api_cache[cache_key] = data
             return data
         else:
-            print(f"Request failed with status code: {response.status_code}")
+            logger.error(f"Request failed with status code: {response.status_code}")
 
     def post(self, url, data=None, recv_window=None, auth=False):
 
@@ -114,7 +129,7 @@ class BinanceAPIUtils:
             return resp
         else:
             resp = response.json()
-            print(
+            logger.error(
                 f"Request failed with status code: {response.status_code}, "
                 f"binance code: {resp['code']} = {resp['msg']} with "
                 f"POST body {data}"
@@ -129,6 +144,10 @@ class BinanceAPIUtils:
         """
         return self.get("/fapi/v1/time")
 
+    def check_delay(self, retry_times=10):
+        delay_ls = [- (self.get_server_time()["serverTime"] - get_ms()) for _ in range(retry_times)]
+        return sum(delay_ls) / len(delay_ls), max(delay_ls)
+
     def get_exchange_info(self, use_cache=True):
         """
         API 获取交易规则和交易对
@@ -142,9 +161,17 @@ class BinanceAPIUtils:
         exchange_info = self.get_exchange_info(use_cache=False)
 
         for symbol_dic in exchange_info['symbols']:
-            if symbol_dic['contractType'] == 'PERPETUAL' and symbol_dic['quoteAsset'] != 'BUSD':
+            if symbol_dic['contractType'] == 'PERPETUAL':
                 self.symbol_info[symbol_dic['symbol']] = symbol_dic
                 self.symbol_all.append(symbol_dic['symbol'])
+
+        delay_avg, delay_max = self.check_delay()
+
+        logger.info(
+            f"Init exchange info success, "
+            f"total {len(self.symbol_all)} symbols, from {self.symbol_all[0]} to {self.symbol_all[-1]}, "
+            f"avg delay {delay_avg:.2f} ms, max delay {delay_max:.2f} ms"
+        )
 
     def get_depth(self):
         # API 深度信息
@@ -284,7 +311,7 @@ class BinanceAPIUtils:
 
                 if not p1 <= price <= p2:
                     status = 5001
-                    print(f"{symbol} price {price} is not valid in [{p1}, {p2}]")
+                    logger.warning(f"{symbol} price {price} is not valid in [{p1}, {p2}]")
                 price = self.pq_filter(price, p1, sp)
                 price = round(price, self.symbol_info[symbol]['pricePrecision'])
 
@@ -295,16 +322,16 @@ class BinanceAPIUtils:
 
                 if not q1 <= quantity <= q2:
                     status = 5002
-                    print(f"{symbol} quantity {quantity} is not valid in [{q1}, {q2}]")
+                    logger.warning(f"{symbol} quantity {quantity} is not valid in [{q1}, {q2}]")
                 quantity = self.pq_filter(quantity, q1, sq)
                 quantity = round(quantity, self.symbol_info[symbol]['quantityPrecision'])
 
             elif filter_type == 'MIN_NOTIONAL':
                 if price * quantity < float(_filter['notional']):
                     status = 5003
-                    print(
+                    logger.warning(
                         f"{symbol} price {price} quantity {quantity} notional is not valid, "
-                        f"must be larger than {_filter['notional']}"
+                        f"total amount is {price * quantity} which smaller than {_filter['notional']}"
                     )
 
             else:
@@ -327,16 +354,19 @@ class BinanceAPIUtils:
         symbol, price, quantity, pq_status = self.order_filter(symbol, price, quantity)
         params = dict(
             symbol=symbol,
-            side=order_side.value,
-            type=OrderType.LIMIT.value,
+            side=order_side,
+            type=OrderType.LIMIT,
             price=price,
             quantity=quantity,
             newClientOrderId=cid,
-            timeInForce=time_in_force.value
+            timeInForce=time_in_force
         )
         if time_in_force == TimeInForce.GTD:
-            assert gtd_second is not None, "gtd_second must be set when use TimeInForce.GTD"
+            if gtd_second is None:
+                logger.error("gtd_second must be set when use TimeInForce.GTD. using default 10 second")
+                gtd_second = 10
             params['goodTillDate'] = int((time.time() + gtd_second) * 1000)
+
         return params, pq_status, oid
 
     def send_limit_order_v1(
@@ -344,7 +374,7 @@ class BinanceAPIUtils:
             symbol,
             price,
             quantity,
-            order_side: OrderSide,
+            order_side,
             oid='auto',
             time_in_force=TimeInForce.GTC,
             gtd_second=None,
@@ -357,16 +387,16 @@ class BinanceAPIUtils:
         params, pq_status, oid = self.generate_limit_order_params_v1(
             symbol, price, quantity, order_side, oid, time_in_force, gtd_second, prefix
         )
-        print(params)
+        logger.debug(params)
 
         if pq_status == 2000:
             resp = self.post(url, params, auth=True)
         else:
             resp = dict(
                 code=pq_status,
-                status=OrderStatus.NOT_SEND.value
+                status=OrderStatus.NOT_SEND
             )
-            print(f"Invalid price {price} and quantity {quantity}, error code {pq_status}")
+            logger.error(f"Invalid price {price} and quantity {quantity}, error code {pq_status}")
 
         if 'updateTime' in resp:
             resp['code'] = -1
@@ -384,7 +414,7 @@ class BinanceAPIUtils:
             response=resp
         )
 
-        print(self.cache["order_all"][oid])
+        # print(self.cache["order_all"][oid])
 
     def send_batch_limit_order_v1(self):
         raise NotImplementedError
@@ -395,11 +425,11 @@ if __name__ == '__main__':
     s.get_server_time()
     # s.get_all_history_order()
     # s.get_balance()
-    print(s.symbol_info['ETHUSDT'])
-    print(s.symbol_all)
+    # print(s.symbol_info['ETHUSDT'])
+    # print(s.symbol_all)
     # s.send_limit_order_v1(
     #     symbol='ETHUSDT',
-    #     price=1600.00,
+    #     price=1000.00,
     #     quantity=0.01,
     #     order_side=OrderSide.BUY,
     #     time_in_force=TimeInForce.GTD,

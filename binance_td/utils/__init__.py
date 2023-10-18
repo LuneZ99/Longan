@@ -1,5 +1,6 @@
 from .config import config
-from .logger import BinanceSyncLogger
-from .tools import *
+# from .logger import BinanceSyncLogger
 
-logger_td = BinanceSyncLogger("td.log")
+# logger_td = BinanceSyncLogger("td.log")
+
+
