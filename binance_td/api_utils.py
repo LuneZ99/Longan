@@ -5,7 +5,9 @@ from pprint import pprint
 
 import httpx
 from diskcache import Cache
-from binance_enum import *
+from tools import *
+
+from binance_td.utils import config, logger_td
 
 
 class BinanceAPIUtils:
@@ -25,8 +27,8 @@ class BinanceAPIUtils:
         # self.api_key = "Gy4D9ha8BGOwu4dMNhBMquZPimmis9m3qQChZiUIhSY6Zdt4dpKV41KvMEgVjP7i"
         # self.api_secret = "Yo5xehT997NqS8yzSvelLS1Jl59bSrJbzLuY4YX4OkQ2UbmgNj2QLXVPHk1oAvfW"
 
-        self.api_key = ...
-        self.api_secret = ...
+        self.api_key = config.api_key
+        self.api_secret = config.api_secret
 
         self.headers = {
             "X-MBX-APIKEY": self.api_key
