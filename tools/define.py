@@ -19,6 +19,7 @@ class TimeInForce:
 
 class OrderStatus:
     NOT_SEND = 'NOT_SEND'
+    ERROR = 'ERROR'
 
     NEW = 'NEW'
     PARTIALLY_FILLED = 'PARTIALLY_FILLED'

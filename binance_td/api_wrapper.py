@@ -5,6 +5,8 @@ from pprint import pprint
 
 import httpx
 from diskcache import Cache
+from httpx import Response
+
 from tools import *
 
 from binance_td.utils import config
@@ -46,6 +48,10 @@ class BinanceAPIUtils:
         self.last_order_id = max(self.order_cache.iterkeys()) if len(self.order_cache) > 0 else 1_000_000
         self.init_exchange_info()
 
+        self.used_weight_1m = 0
+        self.order_count_10s = 0
+        self.order_count_1m = 0
+
     def __del__(self):
         self.client.close()
 
@@ -83,17 +89,18 @@ class BinanceAPIUtils:
         if auth:
             params['timestamp'] = timestamp
             params['signature'] = self.generate_signature(params)
-            response = self.client.get(url, params=params, headers=self.headers)
+            response: Response = self.client.get(url, params=params, headers=self.headers)
         else:
-            response = self.client.get(url, params=params)
+            response: Response = self.client.get(url, params=params)
 
         if response.status_code == 200:
             resp = response.json()
             self.api_cache[cache_key] = resp
             # read rate limit from header
-            logger.info(
-                f"GET request successful. url: {url}, param: {params}, resp: {resp}."
-            )
+            text = f"GET request successful. url: {url}, param: {params}, resp: {resp}."
+            if len(text) > 512:
+                text = text[:512]
+            logger.info(text)
             return resp
         else:
             self.api_cache[cache_key] = None
@@ -114,15 +121,16 @@ class BinanceAPIUtils:
         if auth:
             data['timestamp'] = timestamp
             data['signature'] = self.generate_signature(data)
-            response = self.client.post(url, data=data, headers=self.headers)
+            response: Response = self.client.post(url, data=data, headers=self.headers)
         else:
-            response = self.client.post(url, data=data)
+            response: Response = self.client.post(url, data=data)
 
         resp = response.json()
+        head = response.headers
 
         if response.status_code == 200:
             logger.info(
-                f"POST request successful. url: {url}, data: {data}, resp: {resp}."
+                f"POST request successful. url: {url}, data: {data}, resp: {resp}, resp_header: {head}."
             )
         else:
             logger.error(
@@ -132,6 +140,45 @@ class BinanceAPIUtils:
             )
 
         # read rate limit from header
+        self.used_weight_1m = int(head['x-mbx-used-weight-1m'])
+        self.order_count_10s = int(head['x-mbx-order-count-10s'])
+        self.order_count_1m = int(head['x-mbx-order-count-1m'])
+
+        self.api_cache[cache_key] = resp
+        return resp
+
+    def delete(self, url, data=None, recv_window=None, auth=False):
+
+        url = self.base_url + url
+        timestamp = int(time.time() * 1000)
+        cache_key = f"DELETE_{url}_{timestamp}"
+
+        if data is None:
+            data = dict()
+
+        if recv_window is None:
+            data['recvWindow'] = 5000
+
+        if auth:
+            data['timestamp'] = timestamp
+            data['signature'] = self.generate_signature(data)
+            response: Response = self.client.delete(url, params=data, headers=self.headers)
+        else:
+            response: Response = self.client.delete(url, params=data)
+
+        resp = response.json()
+        head = response.headers
+
+        if response.status_code == 200:
+            logger.info(
+                f"DELETE request successful. url: {url}, data: {data}, resp: {resp}, resp_header: {head}."
+            )
+        else:
+            logger.error(
+                f"DELETE Request failed with status code: {response.status_code}, "
+                f"binance code: {resp['code']} - {resp['msg']} with "
+                f" url: {url}, data: {data}, resp: {resp}."
+            )
 
         self.api_cache[cache_key] = resp
         return resp
@@ -272,6 +319,12 @@ class BinanceAPIUtils:
 
         return symbol, price, quantity, status
 
+    def check_insert_rate_limit(self):
+        if self.order_count_10s > 30:
+            logger.warning(f"Insert order too quickly, {self.order_count_10s} / 10s, {self.order_count_1m} / 1m")
+            return True
+        return False
+
     def generate_limit_order_params_v1(
             self, symbol, price, quantity, order_side, order_id, time_in_force, gtd_second, prefix
     ):
@@ -288,9 +341,9 @@ class BinanceAPIUtils:
             timeInForce=time_in_force
         )
         if time_in_force == TimeInForce.GTD:
-            if gtd_second is None:
-                logger.error("gtd_second must be set when use TimeInForce.GTD. using default 10 second")
-                gtd_second = 10
+            if gtd_second is None or gtd_second <= 600:
+                logger.error("gtd_second must be set and > 600 when use TimeInForce.GTD. using default 601 second")
+                gtd_second = 601
             params['goodTillDate'] = int((time.time() + gtd_second) * 1000)
 
         return params, filter_status, order_id
@@ -306,14 +359,16 @@ class BinanceAPIUtils:
             gtd_second=None,
             prefix='',
             testnet=False,
-
     ):
+        if self.check_insert_rate_limit():
+            return -1
+
         url = "/fapi/v1/order/test" if testnet else "/fapi/v1/order"
 
         params, filter_status, order_id = self.generate_limit_order_params_v1(
             symbol, price, quantity, order_side, order_id, time_in_force, gtd_second, prefix
         )
-        logger.info(params)
+        logger.info(f"generate order params: {params}")
 
         if filter_status == 2000:
             resp = self.post(url, params, auth=True)
@@ -328,9 +383,7 @@ class BinanceAPIUtils:
             resp['code'] = 0
         else:
             resp['updateTime'] = int(time.time() * 1000)
-
-        pprint(resp)
-        print(order_id)
+            resp['status'] = OrderStatus.REJECTED
 
         self.order_cache[order_id] = dict(
             order_status=resp['status'],
@@ -340,13 +393,52 @@ class BinanceAPIUtils:
             response=resp
         )
 
-        # print(self.cache["order_all"][oid])
+        return order_id
 
     def send_batch_limit_order_v1(self):
         raise NotImplementedError
 
+    def delete_order_v1(self, cache_order_id=None, delete_last_order=False):
+
+        url = "/fapi/v1/order"
+
+        orig_cache_order = self.order_cache.peekitem()[1] if delete_last_order else self.order_cache[cache_order_id]
+        if orig_cache_order['order_status'] != 'New':
+            logger.error(f"Last order is not a New insert order, cannot be delete.")
+            return
+
+        symbol = orig_cache_order['params']['symbol']
+        client_order_id = orig_cache_order['params']['newClientOrderId']
+
+        params = dict(
+            symbol=symbol,
+            origClientOrderId=client_order_id
+        )
+
+        resp = self.delete(url, params, auth=True)
+
+        if 'updateTime' in resp:
+            resp['code'] = 0
+        else:
+            resp['updateTime'] = int(time.time() * 1000)
+            resp['status'] = OrderStatus.REJECTED
+
+        order_id = self.last_order_id = self.last_order_id + 1
+
+        self.order_cache[order_id] = dict(
+            order_status=resp['status'],
+            update_time=resp['updateTime'],
+            err_code=resp['code'],
+            params=params,
+            response=resp
+        )
+
+        return order_id
+
 
 if __name__ == '__main__':
+    import time
+
     s = BinanceAPIUtils()
     s.get_server_time()
     # s.get_all_history_order()
@@ -355,12 +447,16 @@ if __name__ == '__main__':
     # print(s.symbol_all)
     s.send_limit_order_v1(
         symbol='ETHUSDT',
-        price=500.00,
+        price=1000.00,
         quantity=0.01,
         order_side=OrderSide.BUY,
-        time_in_force=TimeInForce.GTD,
-        gtd_second=660,
-        prefix='test2',
+        time_in_force=TimeInForce.GTC,
+        prefix='test',
         # testnet=True
     )
+    time.sleep(10)
+    s.delete_order_v1(
+        delete_last_order=True
+    )
+
 
