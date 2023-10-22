@@ -250,7 +250,37 @@ class BinanceAPIUtils:
 
     def get_balance(self):
         data = self.get("/fapi/v2/balance", auth=True)
-        # pprint(data)
+        # TODO: save balance info
+        return data
+
+    def get_account(self):
+        data = self.get("/fapi/v2/account", auth=True)
+        # TODO: save account info
+        return data
+
+    def set_leverage(self, symbol, leverage):
+        params = dict(
+            symbol=symbol,
+            leverage=leverage
+        )
+        self.post("/fapi/v1/leverage", data=params, auth=True)
+
+    def get_income_last_7day(self):
+        """
+        weight: 30
+        """
+        params = dict(
+            limit=1000
+        )
+        data = self.post("/fapi/v1/income", data=params, auth=True)
+        # TODO: update income info
+        return data
+
+    def get_trading_limit_status(self):
+        data = self.post("/fapi/v1/apiTradingStatus", data=dict(), auth=True)
+        # TODO: update trading limit status
+        return data
+
 
     @staticmethod
     def _step_filter(value, min_value, step_value):
@@ -434,6 +464,38 @@ class BinanceAPIUtils:
         )
 
         return order_id
+
+    def delete_all_orders(self, symbol):
+
+        url = "/fapi/v1/allOpenOrders"
+
+        params = dict(
+            symbol=symbol,
+        )
+
+        resp = self.delete(url, params, auth=True)
+
+        if 'updateTime' in resp:
+            resp['code'] = 0
+        else:
+            resp['updateTime'] = int(time.time() * 1000)
+            resp['status'] = OrderStatus.REJECTED
+
+        order_id = self.last_order_id = self.last_order_id + 1
+
+        self.order_cache[order_id] = dict(
+            order_status=resp['status'],
+            update_time=resp['updateTime'],
+            err_code=resp['code'],
+            params=params,
+            response=resp
+        )
+
+        return order_id
+
+    def countdown_cancel_all(self):
+        raise NotImplementedError
+
 
 
 if __name__ == '__main__':
