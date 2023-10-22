@@ -24,23 +24,15 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 
-
 class BinanceAPIUtils:
     symbol_all = []
+    symbol_info = dict()
 
-    def __init__(self, flush_api_cache=False, flush_utils_cache=False):
+    def __init__(self):
+
         self.base_url = 'https://fapi.binance.com'
 
-        proxies = {
-            "http://": "http://127.0.0.1:7890",
-            "https://": "http://127.0.0.1:7890"
-        }
-
-        self.client = httpx.Client(proxies=proxies)
-
-        # example use
-        # self.api_key = "Gy4D9ha8BGOwu4dMNhBMquZPimmis9m3qQChZiUIhSY6Zdt4dpKV41KvMEgVjP7i"
-        # self.api_secret = "Yo5xehT997NqS8yzSvelLS1Jl59bSrJbzLuY4YX4OkQ2UbmgNj2QLXVPHk1oAvfW"
+        self.client = httpx.Client(proxies=config.proxies)
 
         self.api_key = config.api_key
         self.api_secret = config.api_secret
@@ -49,19 +41,13 @@ class BinanceAPIUtils:
             "X-MBX-APIKEY": self.api_key
         }
 
-        self.api_cache = Cache()
-        self.cache = Cache()
-
-        if 'order_all' in self.cache:
-            self.last_order_id = max(self.cache["order_all"].keys())
-        else:
-            self.cache['order_all'] = dict()
-            self.last_order_id = 1_000_000
-
-        # print(self.cache['order_all'])
-
-        self.symbol_info = dict()
+        self.api_cache = Cache(config.api_cache_dir)
+        self.order_cache = Cache(config.order_cache_dir)
+        self.last_order_id = max(self.order_cache.iterkeys()) if len(self.order_cache) > 0 else 1_000_000
         self.init_exchange_info()
+
+    def __del__(self):
+        self.client.close()
 
     def generate_signature(self, params):
 
@@ -81,35 +67,43 @@ class BinanceAPIUtils:
         return signature
 
     def get(self, url, params=None, auth=False, use_cache=False) -> dict:
-        url = self.base_url + url
-        cache_key = f"{url}_{params}"
-
-        if use_cache:
-            data = self.api_cache.get(cache_key, None)
-            if data is not None:
-                print(f"Use cache key: {cache_key}")
-                return data
-
         if params is None:
             params = dict()
 
+        url = self.base_url + url
+        timestamp = int(time.time() * 1000)
+        cache_key = f"GET_{url}_{params}_{timestamp}"
+
+        if use_cache:
+            resp = self.api_cache.get(cache_key, None)
+            if resp is not None:
+                logger.info(f"Use cache key: {cache_key}")
+                return resp
+
         if auth:
-            params['timestamp'] = int(time.time() * 1000)
+            params['timestamp'] = timestamp
             params['signature'] = self.generate_signature(params)
             response = self.client.get(url, params=params, headers=self.headers)
         else:
             response = self.client.get(url, params=params)
 
         if response.status_code == 200:
-            data = response.json()
-            self.api_cache[cache_key] = data
-            return data
+            resp = response.json()
+            self.api_cache[cache_key] = resp
+            # read rate limit from header
+            logger.info(
+                f"GET request successful. url: {url}, param: {params}, resp: {resp}."
+            )
+            return resp
         else:
-            logger.error(f"Request failed with status code: {response.status_code}")
+            self.api_cache[cache_key] = None
+            logger.error(f"GET Request failed with status code: {response.status_code}. url: {url}, param: {params}.")
 
     def post(self, url, data=None, recv_window=None, auth=False):
 
         url = self.base_url + url
+        timestamp = int(time.time() * 1000)
+        cache_key = f"POST_{url}_{timestamp}"
 
         if data is None:
             data = dict()
@@ -118,24 +112,29 @@ class BinanceAPIUtils:
             data['recvWindow'] = 5000
 
         if auth:
-            data['timestamp'] = int(time.time() * 1000)
+            data['timestamp'] = timestamp
             data['signature'] = self.generate_signature(data)
             response = self.client.post(url, data=data, headers=self.headers)
         else:
             response = self.client.post(url, data=data)
 
+        resp = response.json()
+
         if response.status_code == 200:
-            resp = response.json()
-            return resp
-        else:
-            resp = response.json()
-            logger.error(
-                f"Request failed with status code: {response.status_code}, "
-                f"binance code: {resp['code']} = {resp['msg']} with "
-                f"POST body {data}"
+            logger.info(
+                f"POST request successful. url: {url}, data: {data}, resp: {resp}."
             )
-            return resp
-            # assert httpx.HTTPError, f"Request {url} - {response.status_code}"
+        else:
+            logger.error(
+                f"POST Request failed with status code: {response.status_code}, "
+                f"binance code: {resp['code']} - {resp['msg']} with "
+                f" url: {url}, data: {data}, resp: {resp}."
+            )
+
+        # read rate limit from header
+
+        self.api_cache[cache_key] = resp
+        return resp
 
     def get_server_time(self):
         """
@@ -148,7 +147,7 @@ class BinanceAPIUtils:
         delay_ls = [- (self.get_server_time()["serverTime"] - get_ms()) for _ in range(retry_times)]
         return sum(delay_ls) / len(delay_ls), max(delay_ls)
 
-    def get_exchange_info(self, use_cache=True):
+    def get_exchange_info(self, use_cache=False):
         """
         API 获取交易规则和交易对
         """
@@ -173,66 +172,6 @@ class BinanceAPIUtils:
             f"avg delay {delay_avg:.2f} ms, max delay {delay_max:.2f} ms"
         )
 
-    def get_depth(self):
-        # API 深度信息
-        raise NotImplementedError
-
-    def get_trades(self):
-        # API 近期成交
-        raise NotImplementedError
-
-    def get_historical_trades(self):
-        # API 历史成交(MARKET_DATA)
-        raise NotImplementedError
-
-    def get_agg_trades(self):
-        # API 近期成交(归集)
-        raise NotImplementedError
-
-    def get_k_lines(self, symbol, interval, start_time=None, end_time=None, limit=None):
-        """
-        API K线数据
-
-        :param symbol: 交易对
-        :param interval: 时间间隔 [1m 1h 8h ...]
-        :param start_time:
-        :param end_time:
-        :param limit:
-        :return:
-        """
-
-        assert all(x is None for x in [start_time, end_time, limit]), "At least one param is not None."
-        if limit >= 1000:
-            pass
-
-        return self.get(
-            "/fapi/v1/klines",
-            params=dict(
-                symbol=symbol,
-                interval=interval,
-                startTime=start_time,
-                endTime=end_time,
-                limit=limit
-            ),
-            use_cache=True
-        )
-
-    def get_continuous_k_line(self):
-        # API 连续合约K线数据
-        raise NotImplementedError
-
-    def get_index_price_k_line(self):
-        # API 价格指数K线数据
-        raise NotImplementedError
-
-    def get_mark_price_k_line(self):
-        # API 标记价格K线数据
-        raise NotImplementedError
-
-    def get_premium_index_k_line(self):
-        # API 溢价指数K线数据
-        raise NotImplementedError
-
     def get_premium_index(self, symbol):
         """
         API 最新标记价格和资金费率
@@ -247,22 +186,6 @@ class BinanceAPIUtils:
                 symbol=symbol,
             )
         )
-
-    def get_funding_rate(self):
-        # API 资金费率历史
-        raise NotImplementedError
-
-    def get_24hr(self):
-        # API 24hr价格变动情况
-        raise NotImplementedError
-
-    def get_ticker_price(self):
-        # API 最新价格
-        raise NotImplementedError
-
-    def get_book_ticker(self):
-        # API 当前最优挂单
-        raise NotImplementedError
 
     def get_all_history_order(self, symbol=None):
         """
@@ -280,10 +203,14 @@ class BinanceAPIUtils:
 
     def get_balance(self):
         data = self.get("/fapi/v2/balance", auth=True)
-        pprint(data)
+        # pprint(data)
 
     @staticmethod
-    def pq_filter(value, min_value, step_value):
+    def _step_filter(value, min_value, step_value):
+        """
+        修正发单量价数据以符合步进 (step) 要求
+
+        """
         diff = value - min_value
         adjusted_diff = round(diff / step_value) * step_value
         new_value = min_value + adjusted_diff
@@ -312,7 +239,7 @@ class BinanceAPIUtils:
                 if not p1 <= price <= p2:
                     status = 5001
                     logger.warning(f"{symbol} price {price} is not valid in [{p1}, {p2}]")
-                price = self.pq_filter(price, p1, sp)
+                price = self._step_filter(price, p1, sp)
                 price = round(price, self.symbol_info[symbol]['pricePrecision'])
 
             elif filter_type == 'LOT_SIZE':
@@ -323,7 +250,7 @@ class BinanceAPIUtils:
                 if not q1 <= quantity <= q2:
                     status = 5002
                     logger.warning(f"{symbol} quantity {quantity} is not valid in [{q1}, {q2}]")
-                quantity = self.pq_filter(quantity, q1, sq)
+                quantity = self._step_filter(quantity, q1, sq)
                 quantity = round(quantity, self.symbol_info[symbol]['quantityPrecision'])
 
             elif filter_type == 'MIN_NOTIONAL':
@@ -336,7 +263,6 @@ class BinanceAPIUtils:
 
             else:
                 pass
-                # print(_filter)
 
             # NotImplemented
             # 'MARKET_LOT_SIZE'
@@ -347,18 +273,18 @@ class BinanceAPIUtils:
         return symbol, price, quantity, status
 
     def generate_limit_order_params_v1(
-            self, symbol, price, quantity, order_side, oid, time_in_force, gtd_second, prefix
+            self, symbol, price, quantity, order_side, order_id, time_in_force, gtd_second, prefix
     ):
-        oid = self.last_order_id = self.last_order_id + 1 if oid == 'auto' else oid
-        cid = prefix + '_' + str(oid)
-        symbol, price, quantity, pq_status = self.order_filter(symbol, price, quantity)
+        order_id = self.last_order_id = self.last_order_id + 1 if order_id == 'auto' else order_id
+        client_order_id = prefix + '_' + str(order_id)
+        symbol, price, quantity, filter_status = self.order_filter(symbol, price, quantity)
         params = dict(
             symbol=symbol,
             side=order_side,
             type=OrderType.LIMIT,
             price=price,
             quantity=quantity,
-            newClientOrderId=cid,
+            newClientOrderId=client_order_id,
             timeInForce=time_in_force
         )
         if time_in_force == TimeInForce.GTD:
@@ -367,7 +293,7 @@ class BinanceAPIUtils:
                 gtd_second = 10
             params['goodTillDate'] = int((time.time() + gtd_second) * 1000)
 
-        return params, pq_status, oid
+        return params, filter_status, order_id
 
     def send_limit_order_v1(
             self,
@@ -375,7 +301,7 @@ class BinanceAPIUtils:
             price,
             quantity,
             order_side,
-            oid='auto',
+            order_id='auto',
             time_in_force=TimeInForce.GTC,
             gtd_second=None,
             prefix='',
@@ -384,29 +310,29 @@ class BinanceAPIUtils:
     ):
         url = "/fapi/v1/order/test" if testnet else "/fapi/v1/order"
 
-        params, pq_status, oid = self.generate_limit_order_params_v1(
-            symbol, price, quantity, order_side, oid, time_in_force, gtd_second, prefix
+        params, filter_status, order_id = self.generate_limit_order_params_v1(
+            symbol, price, quantity, order_side, order_id, time_in_force, gtd_second, prefix
         )
-        logger.debug(params)
+        logger.info(params)
 
-        if pq_status == 2000:
+        if filter_status == 2000:
             resp = self.post(url, params, auth=True)
         else:
             resp = dict(
-                code=pq_status,
+                code=filter_status,
                 status=OrderStatus.NOT_SEND
             )
-            logger.error(f"Invalid price {price} and quantity {quantity}, error code {pq_status}")
+            logger.error(f"Invalid price {price} and quantity {quantity}, error code {filter_status}")
 
         if 'updateTime' in resp:
-            resp['code'] = -1
+            resp['code'] = 0
         else:
             resp['updateTime'] = int(time.time() * 1000)
 
         pprint(resp)
-        print(oid)
+        print(order_id)
 
-        self.cache["order_all"][oid] = dict(
+        self.order_cache[order_id] = dict(
             order_status=resp['status'],
             update_time=resp['updateTime'],
             err_code=resp['code'],
@@ -427,14 +353,14 @@ if __name__ == '__main__':
     # s.get_balance()
     # print(s.symbol_info['ETHUSDT'])
     # print(s.symbol_all)
-    # s.send_limit_order_v1(
-    #     symbol='ETHUSDT',
-    #     price=1000.00,
-    #     quantity=0.01,
-    #     order_side=OrderSide.BUY,
-    #     time_in_force=TimeInForce.GTD,
-    #     gtd_second=660,
-    #     prefix='test2',
-    #     # testnet=True
-    # )
+    s.send_limit_order_v1(
+        symbol='ETHUSDT',
+        price=500.00,
+        quantity=0.01,
+        order_side=OrderSide.BUY,
+        time_in_force=TimeInForce.GTD,
+        gtd_second=660,
+        prefix='test2',
+        # testnet=True
+    )
 
