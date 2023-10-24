@@ -281,7 +281,6 @@ class BinanceAPIUtils:
         # TODO: update trading limit status
         return data
 
-
     @staticmethod
     def _step_filter(value, min_value, step_value):
         """

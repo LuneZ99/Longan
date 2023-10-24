@@ -29,18 +29,17 @@ class BaseBinanceWSClient:
         self.logger = logger_md
         self.name = name
 
-        if proxy is not None:
-            if isinstance(proxy, str):
-                self.proxy = [proxy.replace("/", "").split(':')]
-                assert len(self.proxy[0]) == 3, "Invalid proxy format, use format like 'http://127.0.0.1:8888'"
-            elif isinstance(proxy, list):
-                self.proxy = []
-                for p in proxy:
-                    _p = p.replace("/", "").split(':')
-                    self.proxy.append(_p)
-                    assert len(_p) == 3, "Invalid proxy format, use format like 'http://127.0.0.1:8888'"
+        if isinstance(proxy, str):
+            self.proxy = [proxy.replace("/", "").split(':')]
+            assert len(self.proxy[0]) == 3, "Invalid proxy format, use format like 'http://127.0.0.1:8888'"
+        elif isinstance(proxy, list):
+            self.proxy = []
+            for p in proxy:
+                _p = p.replace("/", "").split(':')
+                self.proxy.append(_p)
+                assert len(_p) == 3, "Invalid proxy format, use format like 'http://127.0.0.1:8888'"
         else:
-            self.proxy = None
+            self.proxy = [[None for _ in range(3)]]
 
         self.symbols = set()
         self.handlers = dict()
@@ -114,27 +113,22 @@ class BaseBinanceWSClient:
         self.log(INFO, f"CallBacks: \n{pformat(format_dict(self.callbacks))}")
         self.log(INFO, f"Total subscribe num: {self.subscribe_count}")
 
-        if self.proxy is None:
-            while True:
-                if not self.interrupt_cache['flag']:
-                    ws.run_forever()
-                    ws.close()
-                    self.log(ERROR, f"Websocket disconnected, retrying ...")
-                    # self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
-                    time.sleep(3)
-        else:
-            for proxy in itertools.cycle(self.proxy):
-                if not self.interrupt_cache['flag']:
-                    self.log(INFO, f"Using proxy: {proxy}")
-                    ws.run_forever(
-                        http_proxy_host=proxy[1],
-                        http_proxy_port=proxy[2],
-                        proxy_type=proxy[0]
-                    )
-                    ws.close()
-                    self.log(ERROR, f"Websocket disconnected, retrying ...")
-                    # self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
-                    time.sleep(3)
+        for proxy in itertools.cycle(self.proxy):
+            if not self.interrupt_cache['flag']:
+                self.log(INFO, f"Using proxy: {proxy}")
+                ws.run_forever(
+                    http_proxy_host=proxy[1],
+                    http_proxy_port=proxy[2],
+                    proxy_type=proxy[0],
+                    skip_utf8_validation=True
+                )
+                ws.close()
+                self.log(ERROR, f"Websocket disconnected, retrying ...")
+                # self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
+                time.sleep(1)
+            else:
+                # ws.close()
+                break
 
     def _on_open(self, ws):
         self.connect_time = datetime.now()
@@ -144,7 +138,6 @@ class BaseBinanceWSClient:
     def _on_message(self, ws, message):
 
         self.total_message_count += 1
-        message = json.loads(message)
         rec_time = time.time_ns() // 1_000_000
         ori_time = message['data']['E']
         message['rec_time'] = rec_time

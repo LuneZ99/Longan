@@ -6,7 +6,7 @@ from logging import INFO, WARNING
 
 from diskcache import Cache
 
-from binance_md.bn_ws_client import BaseBinanceWSClient
+from binance_md.ws_client import BaseBinanceWSClient
 from binance_md.data_handler import *
 from binance_md.utils import logger_md
 
