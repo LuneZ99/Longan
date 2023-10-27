@@ -26,7 +26,7 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 
-class BinanceAPIUtils:
+class BinanceTradingAPIUtils:
     symbol_all = []
     symbol_info = dict()
 
@@ -500,7 +500,7 @@ class BinanceAPIUtils:
 if __name__ == '__main__':
     import time
 
-    s = BinanceAPIUtils()
+    s = BinanceTradingAPIUtils()
     s.get_server_time()
     # s.get_all_history_order()
     # s.get_balance()
