@@ -22,7 +22,7 @@ def split_list(lst, num_parts):
 def signal_handler(signum, frame):
     logger_md.log(WARNING, "Close all workers.")
 
-    interrupt_cache = Cache("/dev/shm/binance_md_interrupt")
+    interrupt_cache = Cache("/dev/shm/longan_cache/binance_md_interrupt")
     interrupt_cache['flag'] = True
 
     for ii, pp in enumerate(multiprocessing.active_children()):
@@ -131,7 +131,7 @@ if __name__ == '__main__':
         'depth20'
     ]
 
-    split_num = len(symbols) * len(subscribe_list_all) // 100 + 1
+    split_num = len(symbols) * len(subscribe_list_all) // 160 + 1
     split_symbols = split_list(symbols, split_num)
 
     logger_md.log(INFO, f"Starting with {len(symbols)} symbols, split to {split_num} MD workers.")
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     processes = list()
     for i, symbols in enumerate(split_symbols):
         p = multiprocessing.Process(
-            target=md2sql_worker, args=(i, symbols, subscribe_list_all, 1000, config.proxy_url, True)
+            target=md2sql_worker, args=(i, symbols, subscribe_list_all, 0, config.proxy_url, False)
         )
         p.daemon = True
         p.start()

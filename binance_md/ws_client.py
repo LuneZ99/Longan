@@ -63,7 +63,7 @@ class BaseBinanceWSClient:
         self.delay_warning_interval = 60
         self.delay_warning_count = 0
 
-        self.interrupt_cache = Cache("/dev/shm/binance_md_interrupt")
+        self.interrupt_cache = Cache("/dev/shm/longan_cache/binance_md_interrupt")
         self.interrupt_cache['flag'] = False
 
         if config.push_to_litchi:
@@ -74,6 +74,8 @@ class BaseBinanceWSClient:
             except ConnectionRefusedError:
                 self.log(WARN, "ConnectionRefusedError, is litchi_md server running?")
                 self.litchi_md = None
+        else:
+            self.litchi_md = None
 
     def subscribe(self, symbol: str, channel: str, log_interval: int = True):
 
@@ -137,6 +139,7 @@ class BaseBinanceWSClient:
 
     def _on_message(self, ws, message):
 
+        message = json.loads(message)
         self.total_message_count += 1
         rec_time = time.time_ns() // 1_000_000
         ori_time = message['data']['E']
