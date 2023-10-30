@@ -1,8 +1,6 @@
 import itertools
 import json
-import time
 from collections import defaultdict
-from datetime import datetime
 from logging import INFO, ERROR, WARN
 from pprint import pformat
 from typing import Callable
@@ -10,8 +8,10 @@ from typing import Callable
 import websocket
 from diskcache import Cache
 
-from binance_md.utils import config, logger_md
+from binance_md.utils import config, BinanceSyncLogger
 from tools import *
+
+logger_md = BinanceSyncLogger(f"{config.cache_folder}/logs/log.binance_md_ws")
 
 
 def format_dict(default_dict):
