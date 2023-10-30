@@ -8,9 +8,8 @@ from typing import Callable
 import websocket
 from diskcache import Cache
 
-from binance_md.utils import config, BinanceSyncLogger
+from binance_md.utils import config, logger_md
 from tools import *
-
 
 
 def format_dict(default_dict):
