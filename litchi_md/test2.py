@@ -1,10 +1,10 @@
 import websocket
-from time import time
+import time
 import json
 from tools import *
 
 config = DotDict.from_yaml("config.yaml")
-last_time = time()
+last_time = time.time()
 
 if __name__ == '__main__':
     # websocket.enableTrace(True)
@@ -23,14 +23,14 @@ if __name__ == '__main__':
         msg = json.loads(msg)
         # print(msg)
         # # print(msg['time'])
-        delay = (time() * 1000 - float(msg['rec_time']))
+        delay = (time.time() * 1000 - float(msg['rec_time']))
         delay_ls.append(delay)
-        ls = time() - last_time
+        ls = time.time() - last_time
         last_time_ls.append(ls)
-        last_time = time()
+        last_time = time.time()
         #
         if len(delay_ls) % 1000 == 0:
-            print(f"{delay:.4f} ms - avg {sum(delay_ls[-1000:]) / 1000:.4f} ms -"
+            print(f"Delay {delay:.4f} ms - avg {sum(delay_ls[-1000:]) / 1000:.4f} ms -"
                   f" last {last_time_ls[-1] * 1000:.4f} - avg ls {sum(last_time_ls[-1000:]):.4f}")
 
 

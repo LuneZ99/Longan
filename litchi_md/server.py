@@ -1,5 +1,6 @@
 import asyncio
 import websockets
+import time
 
 from tools import *
 
@@ -63,10 +64,8 @@ async def broadcast_handle(websocket, path):
                     pass
                     # if logger_litchi_md:
                     #     logger_litchi_md.warning(f"Unknown client type: {msg}")
-
             else:
                 pass
-
     finally:
         # Unregister.
         if websocket in senders:

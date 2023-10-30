@@ -1,20 +1,19 @@
-from time import sleep, time
+import time
 import json
 import socket
 import websocket
 
 from tools import *
 
+
 config = DotDict.from_yaml("config.yaml")
 
-
-import websocket
 
 litchi_md = websocket.create_connection(config.litchi_md_url)
 
 for i in range(5):
     litchi_md.send(f"{MsgType.register}{RegisterType.sender}")
-    sleep(0.1)
+    time.sleep(0.1)
 
 for i in range(10000):
 
@@ -23,7 +22,7 @@ for i in range(10000):
         break
 
     dic = {
-        "time": time(),
+        "time": time.time(),
         "b": 0
     }
 
