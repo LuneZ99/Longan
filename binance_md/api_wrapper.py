@@ -3,6 +3,7 @@ import logging
 import httpx
 from diskcache import Cache
 from httpx import Response
+from concurrent.futures import ThreadPoolExecutor, wait
 
 from binance_md.utils import config
 from tools import *
@@ -11,7 +12,7 @@ logger = logging.getLogger('logger_md')
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
 
-file_handler = logging.FileHandler("md.log")
+file_handler = logging.FileHandler(f"{config.cache_folder}/logs/log.api_md")
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
@@ -30,14 +31,30 @@ class BinanceMarketDataAPIUtils:
 
         self.client = httpx.Client(proxies=config.proxies)
         self.api_cache = Cache(config.api_cache_dir)
-        self.init_exchange_info()
+        self.request_weight_limit = 2000  # binance limit 2400
+        self.request_weight_cache = Cache(f'{config.cache_folder}/binance_request_weight')
+        self.kline_expire = 32 * 24 * 60 * 60
+        self.md_ws_cache_dir = config.disk_cache_folder
+        self.num_workers = config.num_threads
+        self.executor = ThreadPoolExecutor(max_workers=self.num_workers)
 
-        self.used_weight_1m = 0
+        self.init_exchange_info()
 
     def __del__(self):
         self.client.close()
 
+    def get_request_weight_limit(self):
+        return sum(self.request_weight_cache.get(k, 0) for k in self.request_weight_cache.iterkeys())
+
+    def check_rate_limit(self):
+        if self.request_weight_cache.get('api_limit') is not None:
+            return False
+        if self.get_request_weight_limit() > self.request_weight_limit:
+            return False
+        return True
+
     def get(self, url, params=None, use_cache=False) -> dict:
+
         if params is None:
             params = dict()
 
@@ -57,11 +74,17 @@ class BinanceMarketDataAPIUtils:
             resp = response.json()
             self.api_cache[cache_key] = resp
             # read rate limit from header
-            text = f"GET request successful. url: {url}, param: {params}, resp: {resp}."
+            text = f"GET request successful. " \
+                   f"limit: {self.get_request_weight_limit()}, url: {url}, param: {params}, resp: {resp}."
             if len(text) > 512:
                 text = text[:512]
             logger.info(text)
             return resp
+        elif response.status_code == 429:
+            self.api_cache[cache_key] = None
+            logger.error(f"GET Request failed with status code: {response.status_code}. url: {url}, param: {params}.")
+            logger.error(f"RATE LIMIT 429 !!!")
+            self.request_weight_cache.set('api_limit', 0, expire=60)
         else:
             self.api_cache[cache_key] = None
             logger.error(f"GET Request failed with status code: {response.status_code}. url: {url}, param: {params}.")
@@ -71,9 +94,10 @@ class BinanceMarketDataAPIUtils:
         API 获取服务器时间
         :return: "serverTime": 1499827319559
         """
+        self.request_weight_cache.push(1, expire=60)
         return self.get("/fapi/v1/time")
 
-    def check_delay(self, retry_times=10):
+    def check_delay(self, retry_times=3):
         delay_ls = [- (self.get_server_time()["serverTime"] - get_ms()) for _ in range(retry_times)]
         return sum(delay_ls) / len(delay_ls), max(delay_ls)
 
@@ -81,6 +105,7 @@ class BinanceMarketDataAPIUtils:
         """
         API 获取交易规则和交易对
         """
+        self.request_weight_cache.push(1, expire=60)
         return self.get("/fapi/v1/exchangeInfo", use_cache=use_cache)
 
     def init_exchange_info(self):
@@ -109,6 +134,7 @@ class BinanceMarketDataAPIUtils:
         :param symbol:
         :return:
         """
+        self.request_weight_cache.push(1, expire=60)
 
         return self.get(
             "/fapi/v1/premiumIndex",
@@ -116,6 +142,107 @@ class BinanceMarketDataAPIUtils:
                 symbol=symbol,
             )
         )
+
+    def get_klines(self, symbol, interval, start_time=None, end_time=None, limit=None):
+        """
+        API K 线数据
+
+        :param symbol:
+        :param interval:
+        :param startTime:
+        :param endTime:
+        :param limit:
+        :return:
+        """
+        if limit is None:
+            raise NotImplementedError("limit must be set")
+
+        if limit < 100:
+            self.request_weight_cache.push(1, expire=60)
+        elif limit < 500:
+            self.request_weight_cache.push(2, expire=60)
+        elif limit <= 1000:
+            self.request_weight_cache.push(5, expire=60)
+        else:
+            self.request_weight_cache.push(10, expire=60)
+
+        return self.get(
+            "/fapi/v1/klines",
+            params=dict(
+                symbol=symbol,
+                interval=interval,
+                startTime=start_time,
+                endTime=end_time,
+                limit=limit
+            )
+        )
+
+    def _fix_history_kline_worker(self, symbols, interval, event, limit, hours):
+
+        for symbol in symbols:
+
+            symbol = symbol.lower()
+            timestamps = get_timestamp_list_hour(hours, limit)
+            cache = Cache(f'{self.md_ws_cache_dir}/{symbol}@{event}')
+
+            ori_lines = len(cache)
+            klines = self.get_klines(
+                symbol, interval, timestamps[0], timestamps[-1], limit
+            )
+
+            for kline in klines:
+                key = kline[0]
+                if cache.get(key) is None or not cache[key][-1]:
+                    value = [
+                        kline[0],
+                        kline[0],
+                        kline[0],
+                        kline[6],
+                        float(kline[1]),
+                        float(kline[2]),
+                        float(kline[3]),
+                        float(kline[4]),
+                        float(kline[5]),
+                        float(kline[7]),
+                        int(kline[8]),
+                        float(kline[9]),
+                        float(kline[10]),
+                        True
+                    ]
+                    cache.set(key, value, expire=self.kline_expire - (datetime.now().timestamp() - key / 1000))
+
+            logger.info(f"Fix cache {symbol}@{event}, fix {len(cache) - ori_lines} lines")
+
+    def _fix_history_kline(self, interval, event, limit, hours):
+
+        timestamps = get_timestamp_list_hour(hours, limit)
+
+        symbol_all = []
+        for symbol in self.symbol_all:
+            symbol = symbol.lower()
+            cache = Cache(f'{self.md_ws_cache_dir}/{symbol}@{event}')
+            if all(cache.get(t) is not None and cache[t][-1] for t in timestamps):
+                logger.info(f"Fixed cache {symbol}@{event}, skip ...")
+            else:
+                symbol_all.append(symbol)
+
+        if len(symbol_all) >= self.num_workers * 2:
+            wait([
+                self.executor.submit(
+                    self._fix_history_kline_worker, symbol, interval, event, limit, hours
+                ) for symbol in split_list(symbol_all, self.num_workers)
+            ])
+        else:
+            for symbol in symbol_all:
+                self._fix_history_kline_worker([symbol], interval, event, limit, hours)
+
+        logger.info(f"Fix all klines {interval} cache")
+
+    def fix_history_kline_1h(self):
+        self._fix_history_kline(interval='1h', event='kline_1h', limit=24 * 7, hours=1)
+
+    def fix_history_kline_8h(self):
+        self._fix_history_kline(interval='8h', event='kline_8h', limit=3 * 24, hours=8)
 
 
 if __name__ == '__main__':
