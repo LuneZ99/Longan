@@ -42,8 +42,9 @@ class BaseStreamDiskCacheHandler(BaseHandler):
             logger_md.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
         self.dc = Cache(cache_path, timeout=0.5)
         self.expire_time = expire_time
+        super().__init__()
 
-    def on_close(self):
+    def _on_close(self):
         pass
 
     def process_line(self, data, rec_time):
@@ -77,9 +78,10 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         self.avg_delay = 0
         self.rec_count = 0
         self.last_delay = 0
+        super().__init__()
         self.start_timer()
 
-    def on_close(self):
+    def _on_close(self):
         logger_md.log(WARN, f"Closing... Flush {self.symbol}@{self.event} to sql")
         self.flush_to_sql()
 
@@ -148,7 +150,7 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         next_run_time = now + timedelta(seconds=self.flush_interval)
 
         # 避开分钟线更新
-        if next_run_time.second <= 3 or next_run_time.second >= 58:
+        if next_run_time.second <= 4 or next_run_time.second >= 59:
             next_run_time += timedelta(seconds=5)
 
         return (next_run_time - now).total_seconds()

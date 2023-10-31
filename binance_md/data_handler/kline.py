@@ -5,8 +5,6 @@ from peewee import *
 from binance_md.data_handler.DiskCacheHandler import BaseStreamDiskCacheMysqlHandler
 from binance_md.utils import config, generate_models
 
-kline_list = config.kline_list
-
 # 设置 MySQL 数据库连接
 db = MySQLDatabase(
     'binance_kline',
@@ -47,7 +45,7 @@ class BaseKline(Model):
         )
 
 
-models_kline: dict[str, BaseKline] = generate_models(kline_list, BaseKline)
+models_kline: dict[str, BaseKline] = generate_models(config.kline_list, BaseKline)
 
 
 class KlineHandler(BaseStreamDiskCacheMysqlHandler):
@@ -55,10 +53,9 @@ class KlineHandler(BaseStreamDiskCacheMysqlHandler):
 
     def __init__(self, symbol, event, expire_time=32 * 24 * 60 * 60, flush_interval=120):
         super().__init__(symbol, event, expire_time, flush_interval)
-        self.model = models_kline[self.event.replace("_", "")]
+        self.model = models_kline[self.event]
 
     def _process_line(self, data, rec_time) -> tuple[Any, dict]:
-
         return data['k']['t'], dict(
             symbol=self.symbol,
             rec_time=rec_time,

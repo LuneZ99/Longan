@@ -14,9 +14,6 @@ db = MySQLDatabase(
     port=config.mysql.port
 )
 
-cols_b = [f"bp{i},bv{i}" for i in range(1, 21)]
-cols_s = [f"sp{i},sv{i}" for i in range(1, 21)]
-
 
 class BaseDepth20(Model):
     orig_time = BigIntegerField(primary_key=True, null=False)
@@ -114,6 +111,10 @@ class BaseDepth20(Model):
 
 
 models_depth = generate_models(config.future_symbols, BaseDepth20)
+cols_bp = [f"bp{i}" for i in range(1, 21)]
+cols_bv = [f"bv{i}" for i in range(1, 21)]
+cols_sp = [f"sp{i}" for i in range(1, 21)]
+cols_sv = [f"sv{i}" for i in range(1, 21)]
 
 
 class Depth20Handler(BaseStreamDiskCacheMysqlHandler):
@@ -133,12 +134,12 @@ class Depth20Handler(BaseStreamDiskCacheMysqlHandler):
         dic_d = dict()
 
         for i, pv in enumerate(data['b']):
-            dic_d[f"bp{i + 1}"] = float(pv[0])
-            dic_d[f"bv{i + 1}"] = float(pv[1])
+            dic_d[cols_bp[i]] = float(pv[0])
+            dic_d[cols_bv[i]] = float(pv[1])
 
         for i, pv in enumerate(data['a']):
-            dic_d[f"sp{i + 1}"] = float(pv[0])
-            dic_d[f"sv{i + 1}"] = float(pv[1])
+            dic_d[cols_sp[i]] = float(pv[0])
+            dic_d[cols_sv[i]] = float(pv[1])
 
         if dic_d == self.last_data:
             return None, dict()

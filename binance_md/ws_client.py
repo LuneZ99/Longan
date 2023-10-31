@@ -1,4 +1,3 @@
-import itertools
 import json
 from collections import defaultdict
 from logging import INFO, ERROR, WARN
@@ -20,6 +19,7 @@ def format_dict(default_dict):
 
 
 class BaseBinanceWSClient:
+    ws: websocket.WebSocketApp
 
     def __init__(self, name, proxy=None, ws_trace=False, debug=False):
 
@@ -61,8 +61,7 @@ class BaseBinanceWSClient:
         self.delay_warning_interval = 60
         self.delay_warning_count = 0
 
-        self.interrupt_cache = Cache("/dev/shm/longan_cache/binance_md_interrupt")
-        self.interrupt_cache['flag'] = False
+        self.interrupt_cache = Cache(f"{config.cache_folder}/binance_md_interrupt")
 
         if config.push_to_litchi:
             try:
@@ -97,12 +96,12 @@ class BaseBinanceWSClient:
             self.log(ERROR, f"Subscribed {symbol} failed because {self.subscribe_count} is larger than 200")
             raise ValueError(f"Subscribed {symbol} failed because {self.subscribe_count} is larger than 200")
 
-    def run(self):
+    def run(self, proxy):
 
         if not self.subscribe_url.endswith('/'):
             raise ValueError("Please subscribe a symbol first.")
 
-        ws = websocket.WebSocketApp(
+        self.ws = websocket.WebSocketApp(
             self.subscribe_url[:-1],
             on_message=self._on_message,
             on_open=self._on_open,
@@ -112,23 +111,23 @@ class BaseBinanceWSClient:
         self.log(INFO, f"Strategy Start with subscription url: {self.subscribe_url[:-1]}")
         self.log(INFO, f"CallBacks: \n{pformat(format_dict(self.callbacks))}")
         self.log(INFO, f"Total subscribe num: {self.subscribe_count}")
+        self.log(INFO, f"Using proxy: {proxy}, interrupt flag {self.interrupt_cache['flag']}")
 
-        for proxy in itertools.cycle(self.proxy):
-            if not self.interrupt_cache['flag']:
-                self.log(INFO, f"Using proxy: {proxy}")
-                ws.run_forever(
-                    http_proxy_host=proxy[1],
-                    http_proxy_port=proxy[2],
-                    proxy_type=proxy[0],
-                    skip_utf8_validation=True
-                )
-                ws.close()
-                self.log(ERROR, f"Websocket disconnected, retrying ...")
-                # self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
-                time.sleep(1)
-            else:
-                # ws.close()
-                break
+        self.ws.run_forever(
+            http_proxy_host=proxy[1],
+            http_proxy_port=proxy[2],
+            proxy_type=proxy[0],
+            skip_utf8_validation=True
+        )
+        #     if self.interrupt_cache['flag']:
+        #         self.log(WARN, f"Interrupt signal received.")
+        #         return
+        #     else:
+        #         self.log(ERROR, f"Websocket disconnected, retrying ...")
+        #     # self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
+        # else:
+        #     self.log(WARN, f"Interrupt signal received.")
+        #     return
 
     def _on_open(self, ws):
         self.connect_time = datetime.now()
@@ -136,6 +135,11 @@ class BaseBinanceWSClient:
         self.log(INFO, f"Connection started.")
 
     def _on_message(self, ws, message):
+
+        if self.interrupt_cache['flag']:
+            # self.log(INFO, f"Msg after close")
+            self.ws.close()
+            return
 
         message = json.loads(message)
         self.total_message_count += 1
@@ -186,12 +190,12 @@ class BaseBinanceWSClient:
                 self.litchi_md.send(f"{MsgType.register}{RegisterType.sender}")
 
     def _on_close(self, ws, code, message):
-
-        self.log(WARN, "Websocket Connection closing ...")
         for handler in self.handlers.values():
             handler.on_close()
         if self.litchi_md is not None:
             self.litchi_md.close()
+        self.on_close()
+        self.log(WARN, "Websocket Connection closing ...")
 
     @staticmethod
     def on_missing(symbol: str, name: str, data: dict, rec_time: int):
@@ -212,8 +216,8 @@ class BaseBinanceWSClient:
     # def on_book_ticker(self, symbol: str, name: str, data: dict, rec_time: int):
     #     raise NotImplementedError
 
-    def on_close(self, ws, code, message):
-        pass
+    def on_close(self):
+        raise NotImplementedError
 
     def log(self, level, msg):
         self.logger.log(level, f"MD-{self.name:0>2}: {msg}")
