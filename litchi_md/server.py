@@ -30,44 +30,30 @@ senders = set()
 receivers = set()
 
 
-async def broadcast_handle(websocket, path):
+async def broadcast_handle(websocket: websockets.WebSocketServerProtocol):
     try:
         async for msg in websocket:
-
             msg_type = msg[0]
-
             if msg_type == MsgType.broadcast:
-
                 # If the message is from a sender, broadcast it to all receivers.
-
                 if len(receivers) > 0:
-
                     data = msg[1:]
-                    tasks = [ws.send(data) for ws in receivers]
+                    tasks = [ws.send(data) for ws in receivers if ws != websocket]
                     results = await asyncio.gather(*tasks, return_exceptions=True)
-
                     for ws, result in zip(receivers, results):
                         if isinstance(result, Exception):
                             receivers.remove(ws)
-                            print(f"remove receiver")
-
             elif msg_type == MsgType.register:
-
                 data = msg[1:]
                 if data == RegisterType.sender:
                     senders.add(websocket)
-                    print(f"add sender")
                 elif data == RegisterType.receiver:
                     receivers.add(websocket)
-                    print(f"add receiver")
                 else:
                     pass
-                    # if logger_litchi_md:
-                    #     logger_litchi_md.warning(f"Unknown client type: {msg}")
             else:
                 pass
     finally:
-        # Unregister.
         if websocket in senders:
             senders.remove(websocket)
         if websocket in receivers:
@@ -87,3 +73,4 @@ md_server = websockets.serve(
 
 asyncio.get_event_loop().run_until_complete(md_server)
 asyncio.get_event_loop().run_forever()
+

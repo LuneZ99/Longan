@@ -75,22 +75,22 @@ class BaseBinanceWSClient:
         else:
             self.litchi_md = None
 
-    def subscribe(self, symbol: str, channel: str, log_interval: int = True):
+    def subscribe(self, symbol: str, event: str, log_interval: int = True):
 
         """
         订阅指定的symbol和channel
         """
 
-        self.log(INFO, f"Subscribe {symbol}@{channel}")
-        self.subscribe_url += f"{symbol}@{channel}/"
+        self.log(INFO, f"Subscribe {symbol}@{event}")
+        self.subscribe_url += f"{symbol}@{event}/"
         self.symbols.add(symbol)
 
-        if "@" in channel:
-            channel = channel.split("@")[0]
+        if "@" in event:
+            event = event.split("@")[0]
 
-        self.log_interval[symbol][channel] = log_interval
-        self.log_count[symbol][channel] = 0
-        self.callbacks[symbol][channel] = self._get_callbacks(channel)
+        self.log_interval[symbol][event] = log_interval
+        self.log_count[symbol][event] = 0
+        self.callbacks[symbol][event] = self._get_callbacks(event)
 
         self.subscribe_count += 1
         if self.subscribe_count >= 200:
@@ -218,16 +218,16 @@ class BaseBinanceWSClient:
     def log(self, level, msg):
         self.logger.log(level, f"MD-{self.name:0>2}: {msg}")
 
-    def _get_callbacks(self, channel):
+    def _get_callbacks(self, event):
 
         converted_string = ""
 
-        if "_" in channel:
+        if "_" in event:
             # 输入为下划线格式的字符串
-            converted_string = "on_" + channel
+            converted_string = "on_" + event
         else:
             # 输入为驼峰格式的字符串
-            for i, char in enumerate(channel):
+            for i, char in enumerate(event):
                 if i > 0 and char.isupper():
                     converted_string += "_"
                 converted_string += char.lower()
