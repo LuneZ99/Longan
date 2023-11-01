@@ -7,7 +7,7 @@ from binance_md.utils import config, generate_models
 
 # 设置 MySQL 数据库连接
 db = MySQLDatabase(
-    'binance_depth',
+    'binance_depth20',
     user=config.mysql.user,
     password=config.mysql.password,
     host=config.mysql.host,
@@ -16,7 +16,11 @@ db = MySQLDatabase(
 
 
 class BaseDepth20(Model):
-    orig_time = BigIntegerField(primary_key=True, null=False)
+
+    update_id = BigIntegerField(primary_key=True, null=False)
+    prev_update_id = BigIntegerField(null=False)
+    rec_time = BigIntegerField(null=False)
+    event_time = BigIntegerField(null=False)
     trade_time = BigIntegerField(null=False)
 
     bp1 = FloatField(null=False)
@@ -106,7 +110,7 @@ class BaseDepth20(Model):
     class Meta:
         database = db
         indexes = (
-            (('orig_time',), True),
+            (('update_id',), True),
         )
 
 
@@ -119,7 +123,7 @@ cols_sv = [f"sv{i}" for i in range(1, 21)]
 
 class Depth20Handler(BaseStreamDiskCacheMysqlHandler):
 
-    def __init__(self, symbol, event='depth', expire_time=180, flush_interval=120):
+    def __init__(self, symbol, event='depth20', expire_time=300, flush_interval=120):
         super().__init__(symbol, event, expire_time, flush_interval)
         self.model = models_depth[self.symbol]
         self.last_data = None
@@ -127,8 +131,11 @@ class Depth20Handler(BaseStreamDiskCacheMysqlHandler):
     def _process_line(self, data, rec_time) -> tuple[Any, dict]:
 
         dic_t = dict(
-            orig_time=data['E'],
-            trade_time=data['T']
+            update_id=data['u'],
+            prev_update_id=data['pu'],
+            rec_time=rec_time,
+            event_time=data['E'],
+            trade_time=data['T'],
         )
 
         dic_d = dict()

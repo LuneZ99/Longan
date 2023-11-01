@@ -91,8 +91,9 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         if line == dict():
             return
 
-        self.last_delay = line['orig_time'] - line['trade_time'] \
-            if self.event == 'depth' else line['rec_time'] - line['event_time']
+        # self.last_delay = line['orig_time'] - line['trade_time'] \
+        #     if self.event == 'depth' else line['rec_time'] - line['event_time']
+        self.last_delay = line['rec_time'] - line['event_time']
         self.avg_delay = (self.avg_delay * self.rec_count + self.last_delay) / (self.rec_count + 1)
         self.rec_count += 1
 

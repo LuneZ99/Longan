@@ -119,7 +119,12 @@ while not interrupt_cache['flag']:
     time.sleep(1)
 else:
     while not all(interrupt_cache[k] for k in interrupt_cache.iterkeys()):
-        logger_md.log(INFO, f"Waiting for remain workers closing...")
+        logger_md.log(
+            INFO,
+            f"Waiting for remain "
+            f"{[k for k in interrupt_cache.iterkeys() if interrupt_cache[k] is False]} "
+            f"workers closing... "
+        )
         time.sleep(1)
     else:
         logger_md.log(INFO, f"All workers closed.")
