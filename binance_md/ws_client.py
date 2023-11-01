@@ -77,7 +77,7 @@ class BaseBinanceWSClient:
     def subscribe(self, symbol: str, event: str, log_interval: int = True):
 
         """
-        订阅指定的symbol和channel
+        订阅指定的 symbol 和 event
         """
 
         self.log(INFO, f"Subscribe {symbol}@{event}")
@@ -119,15 +119,6 @@ class BaseBinanceWSClient:
             proxy_type=proxy[0],
             skip_utf8_validation=True
         )
-        #     if self.interrupt_cache['flag']:
-        #         self.log(WARN, f"Interrupt signal received.")
-        #         return
-        #     else:
-        #         self.log(ERROR, f"Websocket disconnected, retrying ...")
-        #     # self.log_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(lambda: 0))
-        # else:
-        #     self.log(WARN, f"Interrupt signal received.")
-        #     return
 
     def _on_open(self, ws):
         self.connect_time = datetime.now()

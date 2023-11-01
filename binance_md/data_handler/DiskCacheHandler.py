@@ -15,9 +15,8 @@ from binance_md.utils import logger_md, config
 cache_folder = config.disk_cache_folder
 
 
-def clear_cache_folder():
-    shutil.rmtree(cache_folder)
-
+# def clear_cache_folder():
+#     shutil.rmtree(cache_folder)
 
 # def get_cache_folder_size():
 #     total_size = 0
@@ -26,8 +25,8 @@ def clear_cache_folder():
 #             file_path = os.path.join(path, file)
 #             total_size += os.path.getsize(file_path)
 #     return round(total_size / 1024 / 1024, 2)  # MB
-#
-#
+
+
 # def get_disk_cache(symbol, event):
 #     return Cache(cache_folder=f"{cache_folder}/{symbol}@{event}")
 
@@ -91,8 +90,6 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         if line == dict():
             return
 
-        # self.last_delay = line['orig_time'] - line['trade_time'] \
-        #     if self.event == 'depth' else line['rec_time'] - line['event_time']
         self.last_delay = line['rec_time'] - line['event_time']
         self.avg_delay = (self.avg_delay * self.rec_count + self.last_delay) / (self.rec_count + 1)
         self.rec_count += 1
@@ -100,7 +97,8 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         lst = list(line.values())
 
         if self.event.startswith('kline'):
-            # monkey patch for k-line data, drop the symbol column when white to cache and flush data
+            # monkey patch for k-line data
+            # drop the symbol (str) column when set cache to improve performances
             lst = lst[1:]
             self.dc.set(key, lst, expire=self.expire_time)
             if line['finish']:
@@ -126,7 +124,6 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
             self.cache_list.clear()
 
     def start_timer(self):
-
         self.timer = threading.Timer(
             self._get_time_diff() + random.uniform(0, self.flush_interval), self.run_periodically
         )
@@ -137,11 +134,8 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
             self.timer.cancel()
 
     def run_periodically(self):
-        # 在这里执行您想要定时运行的操作
         self.flush_to_sql()
-
         # logger_md.log(INFO, f"{self.symbol}@{self.event} Now {now} Next {next_run_time}")
-        # 重新启动定时器
         self.timer = threading.Timer(self._get_time_diff(), self.run_periodically)
         self.timer.start()
 
