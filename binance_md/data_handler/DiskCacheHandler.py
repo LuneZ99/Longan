@@ -19,17 +19,17 @@ def clear_cache_folder():
     shutil.rmtree(cache_folder)
 
 
-def get_cache_folder_size():
-    total_size = 0
-    for path, dirs, files in os.walk(cache_folder):
-        for file in files:
-            file_path = os.path.join(path, file)
-            total_size += os.path.getsize(file_path)
-    return round(total_size / 1024 / 1024, 2)  # MB
-
-
-def get_disk_cache(symbol, event):
-    return Cache(cache_folder=f"{cache_folder}/{symbol}@{event}")
+# def get_cache_folder_size():
+#     total_size = 0
+#     for path, dirs, files in os.walk(cache_folder):
+#         for file in files:
+#             file_path = os.path.join(path, file)
+#             total_size += os.path.getsize(file_path)
+#     return round(total_size / 1024 / 1024, 2)  # MB
+#
+#
+# def get_disk_cache(symbol, event):
+#     return Cache(cache_folder=f"{cache_folder}/{symbol}@{event}")
 
 
 class BaseStreamDiskCacheHandler(BaseHandler):
