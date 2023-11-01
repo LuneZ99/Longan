@@ -28,6 +28,7 @@ config = DotDict.from_yaml("config.yaml")
 # TODO change to dict to support subscriptions
 senders = set()
 receivers = set()
+count = 0
 
 
 async def broadcast_handle(websocket: websockets.WebSocketServerProtocol):
@@ -35,6 +36,10 @@ async def broadcast_handle(websocket: websockets.WebSocketServerProtocol):
         async for msg in websocket:
             msg_type = msg[0]
             if msg_type == MsgType.broadcast:
+                global count
+                count += 1
+                if count % 10000 == 0:
+                    print(f"broadcast count {count}")
                 # If the message is from a sender, broadcast it to all receivers.
                 if len(receivers) > 0:
                     data = msg[1:]
@@ -47,8 +52,10 @@ async def broadcast_handle(websocket: websockets.WebSocketServerProtocol):
                 data = msg[1:]
                 if data == RegisterType.sender:
                     senders.add(websocket)
+                    print(f"add sender")
                 elif data == RegisterType.receiver:
                     receivers.add(websocket)
+                    print(f"add receiver")
                 else:
                     pass
             else:
@@ -56,8 +63,10 @@ async def broadcast_handle(websocket: websockets.WebSocketServerProtocol):
     finally:
         if websocket in senders:
             senders.remove(websocket)
+            print(f"del sender")
         if websocket in receivers:
             receivers.remove(websocket)
+            print(f"del receiver")
 
 
 md_server = websockets.serve(
