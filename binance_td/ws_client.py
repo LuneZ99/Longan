@@ -3,10 +3,12 @@ import hmac
 import itertools
 import time
 from pprint import pprint
+import json
 
 import httpx
 import websocket
 from diskcache import Cache
+import threading
 from httpx import Response
 
 from tools import *
@@ -18,13 +20,15 @@ logger = logging.getLogger('logger_td_ws')
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
 
-file_handler = logging.FileHandler("td_ws.log")
+file_handler = logging.FileHandler(f"{config.cache_folder}/logs/log.binance_td_ws")
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
+
+# websocket.enableTrace(True)
 
 
 class ListenKeyREST:
@@ -63,19 +67,18 @@ class ListenKeyREST:
             data = dict(timestamp=int(time.time() * 1000))
             data['signature'] = self.generate_signature(data)
             r = self.client.delete(self.url, params=data, headers=self.headers)
-            print(r)
         except Exception as e:
             pass
-
 
     def put_listen_key(self):
         data = dict(timestamp=int(time.time() * 1000))
         data['signature'] = self.generate_signature(data)
         r = self.client.put(self.url, params=data, headers=self.headers)
-        print(r)
+        return r.status_code
 
 
 class BinanceTDWSClient:
+    ws: websocket.WebSocketApp
 
     def __init__(self, proxy):
 
@@ -96,43 +99,81 @@ class BinanceTDWSClient:
         self.subscribe_url = f"wss://fstream.binance.com/ws/{self.listen_key}"
         logger.info(f"Subscribe to {self.subscribe_url}")
 
+        if config.push_to_litchi:
+            try:
+                self.litchi_md = websocket.create_connection(config.litchi_md_url)
+                self.litchi_md.send(f"{MsgType.register}{RegisterType.sender}")
+                logger.info("litchi_md connected")
+            except ConnectionRefusedError:
+                logger.warning("ConnectionRefusedError, is litchi_md server running?")
+                self.litchi_md = None
+        else:
+            self.litchi_md = None
+
     def __del__(self):
         self.listen_key_server.delete_listen_key()
-        logger.error(f"Websocket disconnected, retrying ...")
 
     def update_listen_key(self):
-        self.listen_key_server.put_listen_key()
+        while True:
+            resp_code = self.listen_key_server.put_listen_key()
+            if resp_code == 200:
+                logger.info("Update listen key successfully.")
+                time.sleep(60 * 10)
+            else:
+                logger.warning("Update listen key failed.")
+                time.sleep(60)
 
     def run(self):
 
-        ws = websocket.WebSocketApp(
+        self.ws = websocket.WebSocketApp(
             self.subscribe_url,
             on_message=self._on_message,
             on_open=self._on_open,
             on_close=self._on_close,
         )
 
-        # for proxy in itertools.cycle(self.proxy):
         proxy = self.proxy[0]
         logger.info(f"Using proxy: {proxy}")
-        ws.run_forever(
+        self.ws.run_forever(
             http_proxy_host=proxy[1],
             http_proxy_port=proxy[2],
             proxy_type=proxy[0],
             skip_utf8_validation=True
         )
-        ws.close()
-        logger.error(f"Websocket disconnected, retrying ...")
 
     def _on_open(self, ws):
-        pass
+        thread = threading.Thread(target=self.update_listen_key)
+        thread.start()
 
     def _on_message(self, ws, message):
-        print(message)
-        pass
+
+        message = json.loads(message)
+        logger.info(message)
+        rec_time = time.time_ns() // 1_000_000
+        event = message['e']
+        if event == "ORDER_TRADE_UPDATE":
+            symbol = message['o']['s']
+            message['o']['E'] = message['E']
+        else:
+            return
+
+        # send to md
+        if self.litchi_md is not None:
+            try:
+                # if event in config.event_push_to_litchi_md:
+                processed_msg = {
+                    "symbol": symbol,
+                    "event": event,
+                    "rec_time": rec_time,
+                    "data": message['o'],
+                }
+                self.litchi_md.send(f"{MsgType.broadcast}{json.dumps(processed_msg)}")
+            except ConnectionError:
+                logger.warning("Push to litchi_md ConnectionError, is litchi_md server running?")
+                self.litchi_md = websocket.create_connection(config.litchi_md_url)
+                self.litchi_md.send(f"{MsgType.register}{RegisterType.sender}")
 
     def _on_close(self, ws, code, message):
-        print(message)
         pass
 
 
