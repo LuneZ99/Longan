@@ -1,5 +1,6 @@
 binance_md/utils/config.yaml
 binance_td/utils/config.yaml
 litchi_md/config.yaml
+strategy/*
 
 */config.yaml

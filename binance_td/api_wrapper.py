@@ -190,7 +190,7 @@ class BinanceTradingAPIUtils:
         """
         return self.get("/fapi/v1/time")
 
-    def check_delay(self, retry_times=10):
+    def check_delay(self, retry_times=3):
         delay_ls = [- (self.get_server_time()["serverTime"] - get_ms()) for _ in range(retry_times)]
         return sum(delay_ls) / len(delay_ls), max(delay_ls)
 

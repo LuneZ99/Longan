@@ -1,3 +1,5 @@
+import os
+
 from tools.dot_dict import DotDict
 
 
@@ -6,7 +8,9 @@ class Config(DotDict):
     api_secret: str
     proxy_url: str
 
-config = Config.from_yaml('utils/config.yaml')
+
+root_dir = os.path.dirname(os.path.abspath(__file__))
+config = Config.from_yaml(os.path.join(root_dir, "config.yaml"))
 # print(config.disk_cache_folder)
 
 

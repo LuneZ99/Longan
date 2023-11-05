@@ -1,8 +1,6 @@
-import logging
-
 import httpx
 from diskcache import Cache
-from httpx import Response
+from httpx import Response, ConnectTimeout
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from binance_md.utils import config
@@ -53,7 +51,7 @@ class BinanceMarketDataAPIUtils:
             return False
         return True
 
-    def get(self, url, params=None, use_cache=False) -> dict:
+    def get(self, url, params=None, use_cache=False, retry_times=0) -> dict:
 
         if params is None:
             params = dict()
@@ -67,8 +65,14 @@ class BinanceMarketDataAPIUtils:
             if resp is not None:
                 logger.info(f"Use cache key: {cache_key}")
                 return resp
-
-        response: Response = self.client.get(url, params=params)
+        try:
+            response: Response = self.client.get(url, params=params)
+        except ConnectTimeout:
+            logger.error(f"GET Request failed with ConnectTimeout. url: {url}, param: {params}, retrying...")
+            if retry_times < 5:
+                return self.get(url, params=params, use_cache=use_cache, retry_times=retry_times + 1)
+            else:
+                return {}
 
         if response.status_code == 200:
             resp = response.json()
@@ -226,17 +230,20 @@ class BinanceMarketDataAPIUtils:
             else:
                 symbol_all.append(symbol)
 
-        if len(symbol_all) >= self.num_workers * 2:
-            wait([
-                self.executor.submit(
-                    self._fix_history_kline_worker, symbol, interval, event, limit, hours
-                ) for symbol in split_list(symbol_all, self.num_workers)
-            ])
-        else:
-            for symbol in symbol_all:
-                self._fix_history_kline_worker([symbol], interval, event, limit, hours)
+        if len(symbol_all) == 0:
+            logger.info(f"Fix all klines {interval} cache (nothing to do).")
+            return
 
-        logger.info(f"Fix all klines {interval} cache")
+        # performance depends on split length
+        split_symbols = split_list_by_length(symbol_all, 12)
+
+        wait([
+            self.executor.submit(
+                self._fix_history_kline_worker, symbols, interval, event, limit, hours
+            ) for symbols in split_symbols
+        ])
+
+        logger.info(f"Fix all klines {interval} cache with {len(split_symbols)} group workers.")
 
     def fix_history_kline_1h(self):
         self._fix_history_kline(interval='1h', event='kline_1h', limit=24 * 7, hours=1)

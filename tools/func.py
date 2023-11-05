@@ -14,7 +14,7 @@ def get_timestamp_list_hour(hours, n=99):
     return timestamp_list
 
 
-def split_list(lst, n):
+def split_list_averagely(lst, n):
     avg_len = len(lst) // n
     remainder = len(lst) % n
     result = []
@@ -26,12 +26,8 @@ def split_list(lst, n):
     return result
 
 
-def split_list_averagely(lst, num_parts):
-    result = [[] for _ in range(num_parts)]
-    for ii, num in enumerate(lst):
-        index = ii % num_parts
-        result[index].append(num)
-    return result
+def split_list_by_length(lst, n):
+    return [lst[i:i+n] for i in range(0, len(lst), n)]
 
 
 if __name__ == '__main__':

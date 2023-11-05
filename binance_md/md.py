@@ -85,6 +85,7 @@ def binance_md_ws_worker(
 
     for proxy in itertools.cycle(worker.proxy):
         if not _interrupt_cache['flag']:
+            logger_md.log(WARNING, f"MD-{name:0>2}: Connection lost retrying...")
             worker.run(proxy)
         else:
             logger_md.log(WARNING, f"MD-{name:0>2}: Receiving interrupt_cache signal, closing all workers.")
