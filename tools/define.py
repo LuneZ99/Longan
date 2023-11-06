@@ -140,4 +140,4 @@ class DEPTH20:
     sv18 = 82
     sv19 = 83
     sv20 = 84
-
+    CLS = 111
