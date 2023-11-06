@@ -5,6 +5,7 @@ class MsgType:
     register = 'r'
     broadcast = 'b'
     subscribe = 's'
+    push = 'p'
 
 
 class RegisterType:
@@ -140,4 +141,59 @@ class DEPTH20:
     sv18 = 82
     sv19 = 83
     sv20 = 84
-    CLS = 111
+
+    COLS = ['update_id', 'prev_update_id', 'rec_time', 'event_time', 'trade_time'] + \
+           [f"bp{i}" for i in range(1, 21)] + [f"bv{i}" for i in range(1, 21)] + \
+           [f"sp{i}" for i in range(1, 21)] + [f"sv{i}" for i in range(1, 21)]
+
+
+class AggTrade:
+    agg_trade_id = 0
+    rec_time = 1
+    event_time = 2
+    price = 3
+    quantity = 4
+    first_trade_id = 5
+    last_trade_id = 6
+    transact_time = 7
+    is_buyer_maker = 8
+
+    COLS = [
+        'agg_trade_id', 'rec_time', 'event_time', 'price', 'quantity',
+        'first_trade_id', 'last_trade_id', 'transact_time', 'is_buyer_maker'
+    ]
+
+
+class BookTicker:
+    uid = 0
+    rec_time = 1
+    event_time = 2
+    transaction_time = 3
+    bp = 4
+    bv = 5
+    sp = 6
+    sv = 7
+
+    COLS = ['uid', 'rec_time', 'event_time', 'transaction_time', 'bp', 'bv', 'sp', 'sv']
+
+
+class Kline:
+    rec_time = 0
+    event_time = 1
+    open_time = 2
+    close_time = 3
+    open = 4
+    high = 5
+    low = 6
+    close = 7
+    volume = 8
+    quote_volume = 9
+    count = 10
+    taker_buy_volume = 11
+    taker_buy_quote_volume = 12
+    finish = 13
+
+    COLS = [
+        'rec_time', 'event_time', 'open_time', 'close_time', 'open', 'high', 'low', 'close',
+        'volume', 'quote_volume', 'count', 'taker_buy_volume', 'taker_buy_quote_volume', 'finish'
+    ]
