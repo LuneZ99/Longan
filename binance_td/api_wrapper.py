@@ -503,9 +503,9 @@ class BinanceTradingAPIUtils:
 if __name__ == '__main__':
     import time
 
-    s = BinanceTradingAPIUtils()
-    s.get_server_time()
-    print(s.symbol_all)
+    FTT = BinanceTradingAPIUtils()
+    FTT.get_server_time()
+    print(FTT.symbol_all)
     # s.get_all_history_order()
     # s.get_balance()
     # print(s.symbol_info['ETHUSDT'])

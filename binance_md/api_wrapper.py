@@ -255,8 +255,8 @@ class BinanceMarketDataAPIUtils:
 if __name__ == '__main__':
     import time
 
-    s = BinanceMarketDataAPIUtils()
-    s.get_server_time()
+    FTT = BinanceMarketDataAPIUtils()
+    FTT.get_server_time()
     # s.get_all_history_order()
     # s.get_balance()
     # print(s.symbol_info['ETHUSDT'])
