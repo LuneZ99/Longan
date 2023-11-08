@@ -422,7 +422,7 @@ class BinanceTradingAPIUtils:
             response=resp
         )
 
-        return order_id
+        return resp
 
     def send_market_order_v1(self):
         pass
@@ -465,7 +465,7 @@ class BinanceTradingAPIUtils:
             response=resp
         )
 
-        return order_id
+        return resp
 
     def delete_all_orders(self, symbol):
 

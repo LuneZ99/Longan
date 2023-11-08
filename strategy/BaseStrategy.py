@@ -46,6 +46,8 @@ class LitchiBaseStrategy:
             self._on_kline(**msg)
         elif event == 'depth20':
             self._on_depth20(**msg)
+        elif event == 'ORDER_TRADE_UPDATE':
+            self._on_order_trade(**msg)
         else:
             self.on_message(**msg)
 
@@ -57,6 +59,9 @@ class LitchiBaseStrategy:
 
     def _on_kline(self, symbol, event, data, rec_time):
         self.on_kline(symbol, event, data, rec_time)
+
+    def _on_order_trade(self, symbol, event, data, rec_time):
+        self.on_order_trade(symbol, event, data, rec_time)
 
     def _scheduled_task(self):
         while self.scheduled_task_running:
@@ -92,4 +97,7 @@ class LitchiBaseStrategy:
         raise NotImplementedError
 
     def on_depth20(self, symbol, event, data, rec_time):
+        raise NotImplementedError
+
+    def on_order_trade(self, symbol, event, data, rec_time):
         raise NotImplementedError
