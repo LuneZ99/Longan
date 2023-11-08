@@ -424,6 +424,9 @@ class BinanceTradingAPIUtils:
 
         return order_id
 
+    def send_market_order_v1(self):
+        pass
+
     def send_batch_limit_order_v1(self):
         raise NotImplementedError
 
