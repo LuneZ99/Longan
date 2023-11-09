@@ -3,6 +3,7 @@ import hmac
 import time
 from pprint import pprint
 
+import backoff
 import httpx
 from diskcache import Cache
 from httpx import Response
@@ -10,47 +11,32 @@ from httpx import Response
 from tools import *
 
 from binance_td.utils import config
-import logging
 
 
-logger = logging.getLogger('logger_td')
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
-
-file_handler = logging.FileHandler("td.log")
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
-
-
-class BinanceTradingAPIUtils:
+class BinanceFutureTradingAPIUtils:
     symbol_all = []
     symbol_info = dict()
 
     def __init__(self):
 
         self.base_url = 'https://fapi.binance.com'
-
         self.client = httpx.Client(proxies=config.proxies)
-
         self.api_key = config.api_key
         self.api_secret = config.api_secret
-
         self.headers = {
             "X-MBX-APIKEY": self.api_key
         }
+        self.logger = get_logger("binance_future_td", f"{global_config.log_dir}/log.binance_future_td")
 
-        self.api_cache = Cache(config.api_cache_dir)
-        self.order_cache = Cache(config.order_cache_dir)
-        self.last_order_id = max(self.order_cache.iterkeys()) if len(self.order_cache) > 0 else 1_000_000
+        # self.api_cache = Cache(config.api_cache_dir)
+        self.order_cache = Cache(f"{global_config.local_order_cache}")
+        self.last_order_id = max(self.order_cache.iterkeys(), default=1_000_000)
         self.init_exchange_info()
 
-        self.used_weight_1m = 0
-        self.order_count_10s = 0
-        self.order_count_1m = 0
+        self.request_weight_1m_cache = 0
+        self.orders_1m = 0
+        self.orders_10s = 0
+
 
     def __del__(self):
         self.client.close()
@@ -78,13 +64,13 @@ class BinanceTradingAPIUtils:
 
         url = self.base_url + url
         timestamp = int(time.time() * 1000)
-        cache_key = f"GET_{url}_{params}_{timestamp}"
+        # cache_key = f"GET_{url}_{params}_{timestamp}"
 
-        if use_cache:
-            resp = self.api_cache.get(cache_key, None)
-            if resp is not None:
-                logger.info(f"Use cache key: {cache_key}")
-                return resp
+        # if use_cache:
+        #     resp = self.api_cache.get(cache_key, None)
+        #     if resp is not None:
+        #         self.logger.debug(f"Use cache key: {cache_key}")
+        #         return resp
 
         if auth:
             params['timestamp'] = timestamp
@@ -95,22 +81,19 @@ class BinanceTradingAPIUtils:
 
         if response.status_code == 200:
             resp = response.json()
-            self.api_cache[cache_key] = resp
+            # self.api_cache[cache_key] = resp
             # read rate limit from header
-            text = f"GET request successful. url: {url}, param: {params}, resp: {resp}."
-            if len(text) > 512:
-                text = text[:512]
-            logger.info(text)
+            text = f"GET request successful. url: {url}, param: {params}, resp: {resp}."[:512]
+            self.logger.info(text)
             return resp
         else:
-            self.api_cache[cache_key] = None
-            logger.error(f"GET Request failed with status code: {response.status_code}. url: {url}, param: {params}.")
+            # self.api_cache[cache_key] = None
+            self.logger.error(f"GET Request failed with status code: {response.status_code}. url: {url}, param: {params}.")
 
     def post(self, url, data=None, recv_window=None, auth=False):
 
         url = self.base_url + url
         timestamp = int(time.time() * 1000)
-        cache_key = f"POST_{url}_{timestamp}"
 
         if data is None:
             data = dict()
@@ -129,22 +112,21 @@ class BinanceTradingAPIUtils:
         head = response.headers
 
         if response.status_code == 200:
-            logger.info(
+            self.logger.info(
                 f"POST request successful. url: {url}, data: {data}, resp: {resp}, resp_header: {head}."
             )
         else:
-            logger.error(
+            self.logger.error(
                 f"POST Request failed with status code: {response.status_code}, "
                 f"binance code: {resp['code']} - {resp['msg']} with "
                 f" url: {url}, data: {data}, resp: {resp}."
             )
 
         # read rate limit from header
-        self.used_weight_1m = int(head['x-mbx-used-weight-1m'])
-        self.order_count_10s = int(head['x-mbx-order-count-10s'])
-        self.order_count_1m = int(head['x-mbx-order-count-1m'])
+        self.request_weight_1m_cache = int(head['x-mbx-used-weight-1m'])
+        self.orders_1m = int(head['x-mbx-order-count-10s'])
+        self.orders_10s = int(head['x-mbx-order-count-1m'])
 
-        self.api_cache[cache_key] = resp
         return resp
 
     def delete(self, url, data=None, recv_window=None, auth=False):
@@ -170,18 +152,29 @@ class BinanceTradingAPIUtils:
         head = response.headers
 
         if response.status_code == 200:
-            logger.info(
+            self.logger.info(
                 f"DELETE request successful. url: {url}, data: {data}, resp: {resp}, resp_header: {head}."
             )
         else:
-            logger.error(
+            self.logger.error(
                 f"DELETE Request failed with status code: {response.status_code}, "
                 f"binance code: {resp['code']} - {resp['msg']} with "
                 f" url: {url}, data: {data}, resp: {resp}."
             )
 
-        self.api_cache[cache_key] = resp
         return resp
+
+    def check_orders_rate_limit(self):
+        # orders_1m : 1200
+        # orders_10s: 300
+        if self.orders_1m > 1000 or self.orders_10s > 250:
+            self.logger.warning(f"Insert order too quickly, {self.orders_1m} / 10s, {self.orders_10s} / 1m")
+            return True
+        return False
+
+    def check_delay(self, retry_times=3):
+        delay_ls = [- (self.get_server_time()["serverTime"] - get_ms()) for _ in range(retry_times)]
+        return sum(delay_ls) / len(delay_ls), max(delay_ls)
 
     def get_server_time(self):
         """
@@ -189,10 +182,6 @@ class BinanceTradingAPIUtils:
         :return: "serverTime": 1499827319559
         """
         return self.get("/fapi/v1/time")
-
-    def check_delay(self, retry_times=3):
-        delay_ls = [- (self.get_server_time()["serverTime"] - get_ms()) for _ in range(retry_times)]
-        return sum(delay_ls) / len(delay_ls), max(delay_ls)
 
     def get_exchange_info(self, use_cache=False):
         """
@@ -206,6 +195,8 @@ class BinanceTradingAPIUtils:
         """
         exchange_info = self.get_exchange_info(use_cache=False)
 
+        pprint(exchange_info)
+
         for symbol_dic in exchange_info['symbols']:
             if symbol_dic['contractType'] == 'PERPETUAL':
                 self.symbol_info[symbol_dic['symbol']] = symbol_dic
@@ -213,7 +204,7 @@ class BinanceTradingAPIUtils:
 
         delay_avg, delay_max = self.check_delay()
 
-        logger.info(
+        self.logger.info(
             f"Init exchange info success, "
             f"total {len(self.symbol_all)} symbols, from {self.symbol_all[0]} to {self.symbol_all[-1]}, "
             f"avg delay {delay_avg:.2f} ms, max delay {delay_max:.2f} ms"
@@ -314,7 +305,7 @@ class BinanceTradingAPIUtils:
 
                 if not p1 <= price <= p2:
                     status = 5001
-                    logger.warning(f"{symbol} price {price} is not valid in [{p1}, {p2}]")
+                    self.logger.warning(f"{symbol} price {price} is not valid in [{p1}, {p2}]")
                 price = self._step_filter(price, p1, sp)
                 price = round(price, self.symbol_info[symbol]['pricePrecision'])
 
@@ -325,14 +316,14 @@ class BinanceTradingAPIUtils:
 
                 if not q1 <= quantity <= q2:
                     status = 5002
-                    logger.warning(f"{symbol} quantity {quantity} is not valid in [{q1}, {q2}]")
+                    self.logger.warning(f"{symbol} quantity {quantity} is not valid in [{q1}, {q2}]")
                 quantity = self._step_filter(quantity, q1, sq)
                 quantity = round(quantity, self.symbol_info[symbol]['quantityPrecision'])
 
             elif filter_type == 'MIN_NOTIONAL':
                 if price * quantity < float(_filter['notional']):
                     status = 5003
-                    logger.warning(
+                    self.logger.warning(
                         f"{symbol} price {price} quantity {quantity} notional is not valid, "
                         f"total amount is {price * quantity} which smaller than {_filter['notional']}"
                     )
@@ -348,17 +339,13 @@ class BinanceTradingAPIUtils:
 
         return symbol, price, quantity, status
 
-    def check_insert_rate_limit(self):
-        if self.order_count_10s > 30:
-            logger.warning(f"Insert order too quickly, {self.order_count_10s} / 10s, {self.order_count_1m} / 1m")
-            return True
-        return False
-
     def generate_limit_order_params_v1(
-            self, symbol, price, quantity, order_side, order_id, time_in_force, gtd_second, prefix
+            self, symbol, price, quantity, order_side, client_order_id, time_in_force, gtd_second, local_order_id
     ):
-        order_id = self.last_order_id = self.last_order_id + 1 if order_id == 'auto' else order_id
-        client_order_id = prefix + '_' + str(order_id)
+
+        if local_order_id == 'auto':
+            local_order_id = self.last_order_id = self.last_order_id + 1
+
         symbol, price, quantity, filter_status = self.order_filter(symbol, price, quantity)
         params = dict(
             symbol=symbol,
@@ -371,11 +358,11 @@ class BinanceTradingAPIUtils:
         )
         if time_in_force == TimeInForce.GTD:
             if gtd_second is None or gtd_second <= 600:
-                logger.error("gtd_second must be set and > 600 when use TimeInForce.GTD. using default 601 second")
+                self.logger.error("gtd_second must be set and > 600 when use TimeInForce.GTD. using default 601 second")
                 gtd_second = 601
             params['goodTillDate'] = int((time.time() + gtd_second) * 1000)
 
-        return params, filter_status, order_id
+        return params, filter_status, local_order_id
 
     def send_limit_order_v1(
             self,
@@ -383,21 +370,21 @@ class BinanceTradingAPIUtils:
             price,
             quantity,
             order_side,
-            order_id='auto',
+            client_order_id,
             time_in_force=TimeInForce.GTC,
             gtd_second=None,
-            prefix='',
+            local_order_id='auto',
             testnet=False,
     ):
-        if self.check_insert_rate_limit():
+        if self.check_orders_rate_limit():
             return -1
 
         url = "/fapi/v1/order/test" if testnet else "/fapi/v1/order"
 
-        params, filter_status, order_id = self.generate_limit_order_params_v1(
-            symbol, price, quantity, order_side, order_id, time_in_force, gtd_second, prefix
+        params, filter_status, local_order_id = self.generate_limit_order_params_v1(
+            symbol, price, quantity, order_side, client_order_id, time_in_force, gtd_second, local_order_id
         )
-        logger.info(f"generate order params: {params}")
+        self.logger.info(f"generate order params: {params}")
 
         if filter_status == 2000:
             resp = self.post(url, params, auth=True)
@@ -406,23 +393,23 @@ class BinanceTradingAPIUtils:
                 code=filter_status,
                 status=OrderStatus.NOT_SEND
             )
-            logger.error(f"Invalid price {price} and quantity {quantity}, error code {filter_status}")
+            self.logger.error(f"Invalid price {price} and quantity {quantity}, error code {filter_status}")
 
         if 'updateTime' in resp:
             resp['code'] = 0
         else:
-            resp['updateTime'] = int(time.time() * 1000)
+            resp['updateTime'] = get_ms()
             resp['status'] = OrderStatus.REJECTED
 
-        self.order_cache[order_id] = dict(
+        self.order_cache[local_order_id] = dict(
             order_status=resp['status'],
             update_time=resp['updateTime'],
-            err_code=resp['code'],
+            resp_code=resp['code'],
             params=params,
             response=resp
         )
 
-        return resp
+        return local_order_id
 
     def send_market_order_v1(self):
         pass
@@ -430,21 +417,17 @@ class BinanceTradingAPIUtils:
     def send_batch_limit_order_v1(self):
         raise NotImplementedError
 
-    def delete_order_v1(self, cache_order_id=None, delete_last_order=False):
+    def delete_order_v1(self, local_order_id=None):
 
         url = "/fapi/v1/order"
 
-        orig_cache_order = self.order_cache.peekitem()[1] if delete_last_order else self.order_cache[cache_order_id]
-        if orig_cache_order['order_status'] != 'New':
-            logger.error(f"Last order is not a New insert order, cannot be delete.")
-            return
-
+        orig_cache_order = self.order_cache[local_order_id]
         symbol = orig_cache_order['params']['symbol']
-        client_order_id = orig_cache_order['params']['newClientOrderId']
+        local_order_id = orig_cache_order['params']['newClientOrderId']
 
         params = dict(
             symbol=symbol,
-            origClientOrderId=client_order_id
+            origClientOrderId=local_order_id
         )
 
         resp = self.delete(url, params, auth=True)
@@ -499,13 +482,13 @@ class BinanceTradingAPIUtils:
         raise NotImplementedError
 
 
-
 if __name__ == '__main__':
     import time
 
-    FT = BinanceTradingAPIUtils()
+    FT = BinanceFutureTradingAPIUtils()
     FT.get_server_time()
-    print(FT.symbol_all)
+    # print(FT.symbol_all)
+    print(FT.symbol_info['ETHUSDT'])
     # s.get_all_history_order()
     # s.get_balance()
     # print(s.symbol_info['ETHUSDT'])

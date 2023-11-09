@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import logging
 from tools.dot_dict import DotDict
 
@@ -10,6 +11,8 @@ def get_logger(name, logger_dir=None, level=logging.INFO) -> logging.Logger:
     formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
 
     if logger_dir is not None:
+        if not os.path.exists(Path(logger_dir).parent):
+            os.makedirs(Path(logger_dir).parent)
         file_handler = logging.FileHandler(logger_dir)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
