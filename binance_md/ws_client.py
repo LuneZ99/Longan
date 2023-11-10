@@ -108,8 +108,8 @@ class BaseBinanceWSClient:
             on_close=self._on_close
         )
 
-        self.log(INFO, f"Strategy Start with subscription url: {self.subscribe_url[:-1]}")
-        self.log(INFO, f"CallBacks: \n{pformat(format_dict(self.callbacks))}")
+        # self.log(INFO, f"Strategy Start with subscription url: {self.subscribe_url[:-1]}")
+        # self.log(INFO, f"CallBacks: \n{pformat(format_dict(self.callbacks))}")
         self.log(INFO, f"Total subscribe num: {self.subscribe_count}")
         self.log(INFO, f"Using proxy: {proxy}, interrupt flag {self.interrupt_cache['flag']}")
 

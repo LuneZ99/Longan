@@ -33,10 +33,9 @@ class BinanceFutureTradingAPIUtils:
         self.last_order_id = max(self.order_cache.iterkeys(), default=1_000_000)
         self.init_exchange_info()
 
-        self.request_weight_1m_cache = 0
+        self.request_weight_1m = 0
         self.orders_1m = 0
         self.orders_10s = 0
-
 
     def __del__(self):
         self.client.close()
@@ -58,19 +57,12 @@ class BinanceFutureTradingAPIUtils:
 
         return signature
 
-    def get(self, url, params=None, auth=False, use_cache=False) -> dict:
+    def get(self, url, params=None, auth=False) -> dict:
         if params is None:
             params = dict()
 
         url = self.base_url + url
         timestamp = int(time.time() * 1000)
-        # cache_key = f"GET_{url}_{params}_{timestamp}"
-
-        # if use_cache:
-        #     resp = self.api_cache.get(cache_key, None)
-        #     if resp is not None:
-        #         self.logger.debug(f"Use cache key: {cache_key}")
-        #         return resp
 
         if auth:
             params['timestamp'] = timestamp
@@ -79,12 +71,16 @@ class BinanceFutureTradingAPIUtils:
         else:
             response: Response = self.client.get(url, params=params)
 
+        resp = response.json()
+        head = response.headers
+        self.request_weight_1m = head['x-mbx-used-weight-1m']
+
         if response.status_code == 200:
-            resp = response.json()
             # self.api_cache[cache_key] = resp
             # read rate limit from header
             text = f"GET request successful. url: {url}, param: {params}, resp: {resp}."[:512]
             self.logger.info(text)
+            # print(head)
             return resp
         else:
             # self.api_cache[cache_key] = None
@@ -123,7 +119,7 @@ class BinanceFutureTradingAPIUtils:
             )
 
         # read rate limit from header
-        self.request_weight_1m_cache = int(head['x-mbx-used-weight-1m'])
+        self.request_weight_1m = int(head['x-mbx-used-weight-1m'])
         self.orders_1m = int(head['x-mbx-order-count-10s'])
         self.orders_10s = int(head['x-mbx-order-count-1m'])
 
@@ -167,7 +163,8 @@ class BinanceFutureTradingAPIUtils:
     def check_orders_rate_limit(self):
         # orders_1m : 1200
         # orders_10s: 300
-        if self.orders_1m > 1000 or self.orders_10s > 250:
+        # request_weight_1m: 2400
+        if self.orders_1m > 1000 or self.orders_10s > 250 or self.request_weight_1m > 2000:
             self.logger.warning(f"Insert order too quickly, {self.orders_1m} / 10s, {self.orders_10s} / 1m")
             return True
         return False
@@ -183,19 +180,19 @@ class BinanceFutureTradingAPIUtils:
         """
         return self.get("/fapi/v1/time")
 
-    def get_exchange_info(self, use_cache=False):
+    def get_exchange_info(self):
         """
         API 获取交易规则和交易对
         """
-        return self.get("/fapi/v1/exchangeInfo", use_cache=use_cache)
+        return self.get("/fapi/v1/exchangeInfo")
 
     def init_exchange_info(self):
         """
         初始化交易对信息
         """
-        exchange_info = self.get_exchange_info(use_cache=False)
+        exchange_info = self.get_exchange_info()
 
-        pprint(exchange_info)
+        # pprint(exchange_info)
 
         for symbol_dic in exchange_info['symbols']:
             if symbol_dic['contractType'] == 'PERPETUAL':
@@ -488,7 +485,7 @@ if __name__ == '__main__':
     FT = BinanceFutureTradingAPIUtils()
     FT.get_server_time()
     # print(FT.symbol_all)
-    print(FT.symbol_info['ETHUSDT'])
+    # print(FT.symbol_info['ETHUSDT'])
     # s.get_all_history_order()
     # s.get_balance()
     # print(s.symbol_info['ETHUSDT'])
