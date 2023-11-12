@@ -57,6 +57,7 @@ class BinanceFutureTradingAPIUtils:
 
         return signature
 
+    @backoff.on_exception(backoff.expo, httpx.ConnectTimeout, max_tries=5)
     def get(self, url, params=None, auth=False) -> dict:
         if params is None:
             params = dict()
@@ -73,7 +74,7 @@ class BinanceFutureTradingAPIUtils:
 
         resp = response.json()
         head = response.headers
-        self.request_weight_1m = head['x-mbx-used-weight-1m']
+        self.request_weight_1m = int(head['x-mbx-used-weight-1m'])
 
         if response.status_code == 200:
             # self.api_cache[cache_key] = resp
@@ -129,7 +130,6 @@ class BinanceFutureTradingAPIUtils:
 
         url = self.base_url + url
         timestamp = int(time.time() * 1000)
-        cache_key = f"DELETE_{url}_{timestamp}"
 
         if data is None:
             data = dict()
@@ -196,8 +196,9 @@ class BinanceFutureTradingAPIUtils:
 
         for symbol_dic in exchange_info['symbols']:
             if symbol_dic['contractType'] == 'PERPETUAL':
-                self.symbol_info[symbol_dic['symbol']] = symbol_dic
-                self.symbol_all.append(symbol_dic['symbol'])
+                symbol = symbol_dic['symbol'].lower()
+                self.symbol_info[symbol] = symbol_dic
+                self.symbol_all.append(symbol)
 
         delay_avg, delay_max = self.check_delay()
 
@@ -406,7 +407,7 @@ class BinanceFutureTradingAPIUtils:
             response=resp
         )
 
-        return local_order_id
+        return resp
 
     def send_market_order_v1(self):
         pass

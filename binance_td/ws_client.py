@@ -16,19 +16,21 @@ import logging
 from binance_td.utils import config
 
 
-logger = logging.getLogger('logger_td_ws')
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
-
-file_handler = logging.FileHandler(f"{config.cache_folder}/logs/log.binance_td_ws")
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+# logger = logging.getLogger('logger_td_ws')
+# logger.setLevel(logging.DEBUG)
+# formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
+#
+# file_handler = logging.FileHandler(f"{config.cache_folder}/logs/log.binance_td_ws")
+# file_handler.setFormatter(formatter)
+# logger.addHandler(file_handler)
+#
+# console_handler = logging.StreamHandler()
+# console_handler.setFormatter(formatter)
+# logger.addHandler(console_handler)
 
 # websocket.enableTrace(True)
+
+logger = get_logger("logger_td_ws", f"/dev/shm/longan_cache/logs/log.binance_td_ws")
 
 
 class ListenKeyREST:

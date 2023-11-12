@@ -28,7 +28,7 @@ class LitchiBaseStrategy:
         thread = threading.Thread(target=self._scheduled_task)
         thread.start()
 
-    def _on_close(self, ws):
+    def _on_close(self, ws, p1, p2):
         pass
 
     def _on_message(self, ws, msg):
