@@ -415,17 +415,13 @@ class BinanceFutureTradingAPIUtils:
     def send_batch_limit_order_v1(self):
         raise NotImplementedError
 
-    def delete_order_v1(self, local_order_id=None):
+    def delete_order_v1(self, symbol, client_order_id):
 
         url = "/fapi/v1/order"
 
-        orig_cache_order = self.order_cache[local_order_id]
-        symbol = orig_cache_order['params']['symbol']
-        local_order_id = orig_cache_order['params']['newClientOrderId']
-
         params = dict(
             symbol=symbol,
-            origClientOrderId=local_order_id
+            origClientOrderId=client_order_id
         )
 
         resp = self.delete(url, params, auth=True)

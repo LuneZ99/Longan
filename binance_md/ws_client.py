@@ -99,7 +99,7 @@ class BaseBinanceWSClient:
     def run(self, proxy):
 
         if not self.subscribe_url.endswith('/'):
-            raise ValueError("Please subscribe a symbol first.")
+            raise ValueError(f"Please subscribe a symbol first. {self.subscribe_url}")
 
         self.ws = websocket.WebSocketApp(
             self.subscribe_url[:-1],

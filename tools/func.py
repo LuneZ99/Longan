@@ -23,7 +23,7 @@ def split_list_averagely(lst, n):
         end = start + avg_len + (i < remainder)
         result.append(lst[start:end])
         start = end
-    return result
+    return [x for x in result if len(x) > 0]
 
 
 def split_list_by_length(lst, n):
