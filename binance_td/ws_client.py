@@ -1,36 +1,16 @@
 import hashlib
 import hmac
-import itertools
-import time
-from pprint import pprint
 import json
+import threading
+import time
 
 import httpx
 import websocket
-from diskcache import Cache
-import threading
 from httpx import Response
 
-from tools import *
-import logging
-from binance_td.utils import config
-
-
-# logger = logging.getLogger('logger_td_ws')
-# logger.setLevel(logging.DEBUG)
-# formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
-#
-# file_handler = logging.FileHandler(f"{config.cache_folder}/logs/log.binance_td_ws")
-# file_handler.setFormatter(formatter)
-# logger.addHandler(file_handler)
-#
-# console_handler = logging.StreamHandler()
-# console_handler.setFormatter(formatter)
-# logger.addHandler(console_handler)
-
-# websocket.enableTrace(True)
-
-logger = get_logger("logger_td_ws", f"/dev/shm/longan_cache/logs/log.binance_td_ws")
+from binance_td.utils import config, logger
+from litchi_md.client import LitchiClientSender
+from tools import global_config, MsgType, RegisterType, get_ms
 
 
 class ListenKeyREST:
@@ -39,7 +19,7 @@ class ListenKeyREST:
 
         self.url = 'https://fapi.binance.com/fapi/v1/listenKey'
 
-        self.client = httpx.Client(proxies=config.proxies)
+        self.client = httpx.Client(proxies=global_config.proxies)
         self.api_key = config.api_key
         self.api_secret = config.api_secret
         self.listen_key = None
@@ -68,7 +48,7 @@ class ListenKeyREST:
         try:
             data = dict(timestamp=int(time.time() * 1000))
             data['signature'] = self.generate_signature(data)
-            r = self.client.delete(self.url, params=data, headers=self.headers)
+            self.client.delete(self.url, params=data, headers=self.headers)
         except Exception as e:
             pass
 
@@ -100,6 +80,9 @@ class BinanceTDWSClient:
         self.listen_key = self.listen_key_server.post_listen_key()
         self.subscribe_url = f"wss://fstream.binance.com/ws/{self.listen_key}"
         logger.info(f"Subscribe to {self.subscribe_url}")
+
+        self.litchi_client = LitchiClientSender("binance_td_ws", logger=logger)
+        self.litchi_client.send_str(f"{MsgType.register}{RegisterType.sender}")
 
         if config.push_to_litchi:
             try:
@@ -151,29 +134,22 @@ class BinanceTDWSClient:
 
         message = json.loads(message)
         logger.info(message)
-        rec_time = time.time_ns() // 1_000_000
+        rec_time = get_ms()
         event = message['e']
+
+        # OT_UPDATE
         if event == "ORDER_TRADE_UPDATE":
             symbol = message['o']['s']
             message['o']['E'] = message['E']
         else:
             return
-
-        # send to md
-        if self.litchi_md is not None:
-            try:
-                # if event in config.event_push_to_litchi_md:
-                processed_msg = {
-                    "symbol": symbol,
-                    "event": event,
-                    "rec_time": rec_time,
-                    "data": message['o'],
-                }
-                self.litchi_md.send(f"{MsgType.broadcast}{json.dumps(processed_msg)}")
-            except ConnectionError:
-                logger.warning("Push to litchi_md ConnectionError, is litchi_md server running?")
-                self.litchi_md = websocket.create_connection(config.litchi_md_url)
-                self.litchi_md.send(f"{MsgType.register}{RegisterType.sender}")
+        processed_msg = {
+            "symbol": symbol,
+            "event": event,
+            "rec_time": rec_time,
+            "data": message['o'],
+        }
+        self.litchi_client.broadcast(processed_msg)
 
     def _on_close(self, ws, code, message):
         pass
@@ -182,6 +158,3 @@ class BinanceTDWSClient:
 if __name__ == '__main__':
     tws = BinanceTDWSClient(config.proxy_url)
     tws.run()
-
-
-

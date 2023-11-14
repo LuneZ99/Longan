@@ -174,11 +174,11 @@ class BaseBinanceWSClient:
                         "rec_time": rec_time,
                         "data": processed_data,
                     }
-                    self.litchi_md.send(f"{MsgType.broadcast}{json.dumps(processed_msg)}")
+                    self.litchi_md.broadcast(f"{MsgType.broadcast}{json.dumps(processed_msg)}")
             except ConnectionError:
                 self.log(WARN, "Push to litchi_md ConnectionError, is litchi_md server running?")
                 self.litchi_md = websocket.create_connection(config.litchi_md_url)
-                self.litchi_md.send(f"{MsgType.register}{RegisterType.sender}")
+                self.litchi_md.broadcast(f"{MsgType.register}{RegisterType.sender}")
 
     def _on_close(self, ws, code, message):
         for handler in self.handlers.values():

@@ -12,7 +12,7 @@ config = DotDict.from_yaml("config.yaml")
 litchi_md = websocket.create_connection(config.litchi_md_url)
 
 for i in range(5):
-    litchi_md.send(f"{MsgType.register}{RegisterType.sender}")
+    litchi_md.broadcast(f"{MsgType.register}{RegisterType.sender}")
     time.sleep(0.1)
 
 for i in range(10000):
@@ -27,7 +27,7 @@ for i in range(10000):
     }
 
     try:
-        litchi_md.send(f"{MsgType.broadcast}{json.dumps(dic)}")
+        litchi_md.broadcast(f"{MsgType.broadcast}{json.dumps(dic)}")
     except ConnectionError:
         print('The server is closed. Stopping the message sending.')
         break

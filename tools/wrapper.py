@@ -1,7 +1,8 @@
+from dataclasses import dataclass
 import os
 from pathlib import Path
 import logging
-from tools.dot_dict import DotDict
+import yaml
 
 
 def get_logger(name, logger_dir=None, level=logging.INFO) -> logging.Logger:
@@ -24,8 +25,34 @@ def get_logger(name, logger_dir=None, level=logging.INFO) -> logging.Logger:
     return logger
 
 
-def get_config(config_dir):
-    return DotDict.from_yaml(config_dir)
+# def get_config(config_dir):
+#     return DotDict.from_yaml(config_dir)
 
 
-global_config = get_config(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml"))
+@dataclass
+class GlobalConfig:
+    cache_dir: str
+    log_dir: str
+    disk_cache_dir: str
+    local_order_cache: str
+
+    proxies_all: list[dict[str, str]]
+    proxies: dict[str, str]
+    proxy_url: str
+
+    @property
+    def proxies(self) -> dict[str, str]:
+        return self.proxies_all[0]
+
+    @property
+    def proxy_url(self) -> str:
+        return self.proxies_all[0]["http://"]
+
+    @classmethod
+    def from_yaml(cls, file_path: str):
+        with open(file_path, 'r') as file:
+            return cls(**yaml.safe_load(file))
+
+
+global_config = GlobalConfig.from_yaml(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml"))
+

@@ -43,7 +43,7 @@ async def broadcast_handle(websocket: websockets.WebSocketServerProtocol):
                 # If the message is from a sender, broadcast it to all receivers.
                 if len(receivers) > 0:
                     data = msg[1:]
-                    tasks = [ws.send(data) for ws in receivers if ws != websocket]
+                    tasks = [ws.broadcast(data) for ws in receivers if ws != websocket]
                     results = await asyncio.gather(*tasks, return_exceptions=True)
                     for ws, result in zip(receivers, results):
                         if isinstance(result, Exception):

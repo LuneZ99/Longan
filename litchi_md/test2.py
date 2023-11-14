@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
 
     def on_open(ws):
-        ws.send(f"{MsgType.register}{RegisterType.receiver}")
+        ws.broadcast(f"{MsgType.register}{RegisterType.receiver}")
 
 
     def on_message(ws, msg):

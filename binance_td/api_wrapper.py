@@ -1,7 +1,5 @@
 import hashlib
 import hmac
-import time
-from pprint import pprint
 
 import backoff
 import httpx

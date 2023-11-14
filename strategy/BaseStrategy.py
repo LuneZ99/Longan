@@ -23,7 +23,7 @@ class LitchiBaseStrategy:
         self.running = False
 
     def _on_open(self, ws):
-        ws.send(f"{MsgType.register}{RegisterType.receiver}")
+        ws.broadcast(f"{MsgType.register}{RegisterType.receiver}")
         self.scheduled_task_running = True
         thread = threading.Thread(target=self._scheduled_task)
         thread.start()
