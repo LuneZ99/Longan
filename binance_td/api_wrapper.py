@@ -18,7 +18,7 @@ class BinanceFutureTradingAPIUtils:
     def __init__(self):
 
         self.base_url = 'https://fapi.binance.com'
-        self.client = httpx.Client(proxies=config.proxies)
+        self.client = httpx.Client(proxies=global_config.proxies)
         self.api_key = config.api_key
         self.api_secret = config.api_secret
         self.headers = {
@@ -36,7 +36,8 @@ class BinanceFutureTradingAPIUtils:
         self.orders_10s = 0
 
     def __del__(self):
-        self.client.close()
+        pass
+        # self.client.close()
 
     def generate_signature(self, params):
 
@@ -479,7 +480,7 @@ if __name__ == '__main__':
 
     FT = BinanceFutureTradingAPIUtils()
     FT.get_server_time()
-    # print(FT.symbol_all)
+    print(FT.symbol_all)
     # print(FT.symbol_info['ETHUSDT'])
     # s.get_all_history_order()
     # s.get_balance()

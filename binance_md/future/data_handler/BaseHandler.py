@@ -1,8 +1,8 @@
 from diskcache import Cache
 from peewee import Model
 
-from binance_md.utils import config
-
+from binance_md.future.utils import config
+from tools import global_config
 
 class BaseHandler:
     date: str
@@ -10,7 +10,7 @@ class BaseHandler:
     event: str
 
     def __init__(self):
-        self.interrupt_cache = Cache(f"{config.cache_folder}/binance_md_interrupt")
+        self.interrupt_cache = Cache(f"{global_config.cache_dir}/binance_md_interrupt")
         self.interrupt_cache[f"{self.symbol}@{self.event}"] = False
 
     def on_close(self):

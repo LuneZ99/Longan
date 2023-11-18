@@ -3,12 +3,12 @@ import logging
 
 import websocket
 
-from tools import get_logger, MsgType, RegisterType
+from tools import MsgType, RegisterType, global_config
 
 
 class LitchiClientSender:
 
-    def __init__(self, name, logger, litchi_url="ws://localhost:8010", auto_connect=True):
+    def __init__(self, name, logger, litchi_url=global_config.litchi_md_url, auto_connect=True):
         super(LitchiClientSender, self).__init__()
 
         self.name = name
@@ -29,8 +29,9 @@ class LitchiClientSender:
             return
         try:
             self.client = websocket.create_connection(self.litchi_url)
-            self.client.send_str(f"{MsgType.register}{RegisterType.sender}")
+            self.client.send(f"{MsgType.register}{RegisterType.sender}")
             self.logger.info(f"litchi_client connected")
+            self.connected = True
         except ConnectionRefusedError:
             self.logger.warning("ConnectionRefusedError, is litchi_md server running?")
 

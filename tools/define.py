@@ -1,6 +1,3 @@
-from tools.dot_dict import DotDict
-
-
 class MsgType:
     register = 'r'
     broadcast = 'b'

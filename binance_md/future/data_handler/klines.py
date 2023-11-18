@@ -2,16 +2,16 @@ from typing import Any
 
 from peewee import *
 
-from binance_md.data_handler.DiskCacheHandler import BaseStreamDiskCacheMysqlHandler
-from binance_md.utils import config, generate_models
+from binance_md.future.data_handler.DiskCacheHandler import BaseStreamDiskCacheMysqlHandler
+from binance_md.future.utils import config, generate_models
 
 # 设置 MySQL 数据库连接
 db = MySQLDatabase(
-    'binance_kline',
-    user=config.mysql.user,
-    password=config.mysql.password,
-    host=config.mysql.host,
-    port=config.mysql.port
+    'binance_future_klines',
+    user=config.mysql['user'],
+    password=config.mysql['password'],
+    host=config.mysql['host'],
+    port=config.mysql['port']
 )
 
 

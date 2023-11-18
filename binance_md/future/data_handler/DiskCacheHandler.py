@@ -1,6 +1,5 @@
 import os
 import random
-import shutil
 import threading
 from datetime import datetime, timedelta
 from logging import INFO, WARN, DEBUG
@@ -9,26 +8,11 @@ from typing import Any
 from diskcache import Cache
 from peewee import Model
 
-from binance_md.data_handler.BaseHandler import BaseHandler
-from binance_md.utils import logger_md, config
+from binance_md.future.data_handler.BaseHandler import BaseHandler
+from binance_md.future.utils import logger, config
+from tools import global_config
 
-cache_folder = config.disk_cache_folder
-
-
-# def clear_cache_folder():
-#     shutil.rmtree(cache_folder)
-
-# def get_cache_folder_size():
-#     total_size = 0
-#     for path, dirs, files in os.walk(cache_folder):
-#         for file in files:
-#             file_path = os.path.join(path, file)
-#             total_size += os.path.getsize(file_path)
-#     return round(total_size / 1024 / 1024, 2)  # MB
-
-
-# def get_disk_cache(symbol, event):
-#     return Cache(cache_folder=f"{cache_folder}/{symbol}@{event}")
+cache_folder = global_config.md_ws_cache
 
 
 class BaseStreamDiskCacheHandler(BaseHandler):
@@ -38,7 +22,7 @@ class BaseStreamDiskCacheHandler(BaseHandler):
         self.event = event
         cache_path = f"{cache_folder}/{symbol}@{event}"
         if not os.path.exists(cache_path):
-            logger_md.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
+            logger.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
         self.dc = Cache(cache_path, timeout=0.5)
         self.expire_time = expire_time
         super().__init__()
@@ -68,9 +52,9 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         self.event = event
         cache_path = f"{cache_folder}/{symbol}@{event}"
         if not os.path.exists(cache_path):
-            logger_md.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
+            logger.log(INFO, f"Create cache on {cache_folder}/{symbol}@{event}")
         self.dc = Cache(cache_path, timeout=0.5)
-        logger_md.log(DEBUG, f"Success load cache on {cache_folder}/{symbol}@{event}")
+        logger.log(DEBUG, f"Success load cache on {cache_folder}/{symbol}@{event}")
         self.cache_list = list()
         self.expire_time = expire_time
         self.flush_interval = flush_interval
@@ -81,7 +65,7 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         self.start_timer()
 
     def _on_close(self):
-        logger_md.log(WARN, f"Closing... Flush {self.symbol}@{self.event} to sql")
+        logger.log(WARN, f"Closing... Flush {self.symbol}@{self.event} to sql")
         self.flush_to_sql()
 
     def process_line(self, data, rec_time):
@@ -114,7 +98,7 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
     def flush_to_sql(self):
         # with db.atomic():
         if len(self.cache_list) > 0:
-            logger_md.log(
+            logger.log(
                 INFO,
                 f"Flush {self.symbol:>13}@{self.event:<9} [{len(self.cache_list):>5}] to sql | "
                 f"avg delay {self.avg_delay:>4.0f} ms | "
@@ -135,7 +119,7 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
 
     def run_periodically(self):
         self.flush_to_sql()
-        # logger_md.log(INFO, f"{self.symbol}@{self.event} Now {now} Next {next_run_time}")
+        # logger.log(INFO, f"{self.symbol}@{self.event} Now {now} Next {next_run_time}")
         self.timer = threading.Timer(self._get_time_diff(), self.run_periodically)
         self.timer.start()
 

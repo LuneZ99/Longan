@@ -35,18 +35,21 @@ class GlobalConfig:
     log_dir: str
     disk_cache_dir: str
     local_order_cache: str
+    md_ws_cache: str
 
-    proxies_all: list[dict[str, str]]
+    # proxies_all: list[dict[str, str]]
     proxies: dict[str, str]
     proxy_url: str
 
-    @property
-    def proxies(self) -> dict[str, str]:
-        return self.proxies_all[0]
+    litchi_md_url: str
 
-    @property
-    def proxy_url(self) -> str:
-        return self.proxies_all[0]["http://"]
+    # @property
+    # def proxies(self) -> dict[str, str]:
+    #     return self.proxies_all[0]
+    #
+    # @property
+    # def proxy_url(self) -> str:
+    #     return self.proxies_all[0]["http://"]
 
     @classmethod
     def from_yaml(cls, file_path: str):

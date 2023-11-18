@@ -1,14 +1,15 @@
 import itertools
 import multiprocessing
 import signal
+import time
 from logging import INFO, WARNING
 
 from diskcache import Cache
 
-from binance_md.data_handler import *
-from binance_md.utils import logger_md, config
-from binance_md.ws_client import BaseBinanceWSClient
-from tools import *
+from binance_md.future.data_handler import *
+from binance_md.future.utils import logger, config
+from binance_md.future.ws_client import BaseBinanceWSClient
+from tools import global_config, split_list_averagely
 
 
 class SymbolStreamMysqlHandler:
@@ -77,7 +78,7 @@ def binance_md_ws_worker(
         ws_trace=ws_trace
     )
 
-    _interrupt_cache = Cache(f"{config.cache_folder}/binance_md_interrupt")
+    _interrupt_cache = Cache(f"{global_config.cache_dir}/future_md_interrupt")
 
     for _symbol in symbols_all:
         for event in subscribe_list:
@@ -85,21 +86,21 @@ def binance_md_ws_worker(
 
     for proxy in itertools.cycle(worker.proxy):
         if not _interrupt_cache['flag']:
-            logger_md.log(WARNING, f"MD-{name:0>2}: Connection lost retrying...")
+            logger.log(WARNING, f"MD-{name:0>2}: Connection lost retrying...")
             worker.run(proxy)
         else:
-            logger_md.log(WARNING, f"MD-{name:0>2}: Receiving interrupt_cache signal, closing all workers.")
+            logger.log(WARNING, f"MD-{name:0>2}: Receiving interrupt_cache signal, closing all workers.")
             break
 
 
-interrupt_cache = Cache(f"{config.cache_folder}/binance_md_interrupt")
+interrupt_cache = Cache(f"{global_config.cache_dir}/future_md_interrupt")
 interrupt_cache.clear()
 interrupt_cache['flag'] = False
 
 
 def signal_handler(signum, frame):
     global interrupt_cache
-    logger_md.log(WARNING, "Send interrupt_cache signal, closing all workers.")
+    logger.log(WARNING, "Send interrupt_cache signal, closing all workers.")
     interrupt_cache['flag'] = True
 
 
@@ -107,11 +108,11 @@ signal.signal(signal.SIGINT, signal_handler)
 
 split_num = len(config.future_symbols) * len(
     config.subscribe_events) // 100 + 1 if config.num_threads == 0 else config.num_threads
-logger_md.log(INFO, f"Starting with {len(config.future_symbols)} symbols, split to {split_num} MD workers.")
+logger.log(INFO, f"Starting with {len(config.future_symbols)} symbols, split to {split_num} MD workers.")
 
 for i, _symbols in enumerate(split_list_averagely(config.future_symbols, split_num)):
     p = multiprocessing.Process(
-        target=binance_md_ws_worker, args=(i, _symbols, config.subscribe_events, 0, config.proxy_url, False)
+        target=binance_md_ws_worker, args=(i, _symbols, config.subscribe_events, 0, global_config.proxy_url, False)
     )
     p.daemon = True
     p.start()
@@ -120,7 +121,7 @@ while not interrupt_cache['flag']:
     time.sleep(1)
 else:
     while not all(interrupt_cache[k] for k in interrupt_cache.iterkeys()):
-        logger_md.log(
+        logger.log(
             INFO,
             f"Waiting for remain "
             f"{[k for k in interrupt_cache.iterkeys() if interrupt_cache[k] is False]} "
@@ -128,4 +129,4 @@ else:
         )
         time.sleep(1)
     else:
-        logger_md.log(INFO, f"All workers closed.")
+        logger.log(INFO, f"All workers closed.")

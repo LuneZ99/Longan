@@ -1,22 +1,11 @@
 import httpx
+from datetime import datetime
 from diskcache import Cache
 from httpx import Response, ConnectTimeout
 from concurrent.futures import ThreadPoolExecutor, wait
 
-from binance_md.utils import config
-from tools import *
-
-logger = logging.getLogger('logger_md')
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
-
-file_handler = logging.FileHandler(f"{config.cache_folder}/logs/log.api_md")
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+from binance_md.future.utils import config, logger
+from tools import global_config, get_ms, get_timestamp_list_hour, split_list_by_length
 
 
 class BinanceMarketDataAPIUtils:
@@ -27,12 +16,12 @@ class BinanceMarketDataAPIUtils:
 
         self.base_url = 'https://fapi.binance.com'
 
-        self.client = httpx.Client(proxies=config.proxies)
+        self.client = httpx.Client(proxies=global_config.proxies)
         self.api_cache = Cache(config.api_cache_dir)
         self.request_weight_limit = 2000  # binance limit 2400
-        self.request_weight_cache = Cache(f'{config.cache_folder}/binance_request_weight')
+        self.request_weight_cache = Cache(f'{global_config.cache_dir}/binance_request_weight')
         self.kline_expire = 32 * 24 * 60 * 60
-        self.md_ws_cache_dir = config.disk_cache_folder
+        self.md_ws_cache_dir = global_config.md_ws_cache
         self.num_workers = config.num_threads
         self.executor = ThreadPoolExecutor(max_workers=self.num_workers)
 

@@ -1,13 +1,13 @@
 import json
 from collections import defaultdict
 from logging import INFO, ERROR, WARN
-from pprint import pformat
 from typing import Callable
 
 import websocket
 from diskcache import Cache
 
-from binance_md.utils import config, logger_md
+from binance_md.future.utils import config, logger
+from litchi_md.client import LitchiClientSender
 from tools import *
 
 
@@ -24,7 +24,7 @@ class BaseBinanceWSClient:
     def __init__(self, name, proxy=None, ws_trace=False, debug=False):
 
         self.config = config
-        self.logger = logger_md
+        self.logger = logger
         self.name = name
 
         if isinstance(proxy, str):
@@ -61,16 +61,17 @@ class BaseBinanceWSClient:
         self.delay_warning_interval = 60
         self.delay_warning_count = 0
 
-        self.interrupt_cache = Cache(f"{config.cache_folder}/binance_md_interrupt")
+        self.interrupt_cache = Cache(f"{global_config.cache_dir}/future_md_interrupt")
 
         if config.push_to_litchi:
-            try:
-                self.litchi_md = websocket.create_connection(config.litchi_md_url)
-                self.litchi_md.send(f"{MsgType.register}{RegisterType.sender}")
-                self.log(INFO, "litchi_md connected")
-            except ConnectionRefusedError:
-                self.log(WARN, "ConnectionRefusedError, is litchi_md server running?")
-                self.litchi_md = None
+            self.litchi_md = LitchiClientSender("future_md_ws", logger)
+            # try:
+            #     self.litchi_md = websocket.create_connection(global_config.litchi_md_url)
+            #     self.litchi_md.send(f"{MsgType.register}{RegisterType.sender}")
+            #     self.log(INFO, "litchi_md connected")
+            # except ConnectionRefusedError:
+            #     self.log(WARN, "ConnectionRefusedError, is litchi_md server running?")
+            #     self.litchi_md = None
         else:
             self.litchi_md = None
 
@@ -127,6 +128,8 @@ class BaseBinanceWSClient:
 
     def _on_message(self, ws, message):
 
+        # print(message)
+
         if self.interrupt_cache['flag']:
             # self.log(INFO, f"Msg after close")
             self.ws.close()
@@ -166,19 +169,14 @@ class BaseBinanceWSClient:
 
         # send to md
         if self.litchi_md is not None:
-            try:
-                if event in config.event_push_to_litchi_md:
-                    processed_msg = {
-                        "symbol": symbol,
-                        "event": event,
-                        "rec_time": rec_time,
-                        "data": processed_data,
-                    }
-                    self.litchi_md.broadcast(f"{MsgType.broadcast}{json.dumps(processed_msg)}")
-            except ConnectionError:
-                self.log(WARN, "Push to litchi_md ConnectionError, is litchi_md server running?")
-                self.litchi_md = websocket.create_connection(config.litchi_md_url)
-                self.litchi_md.broadcast(f"{MsgType.register}{RegisterType.sender}")
+            if event in config.event_push_to_litchi_md:
+                processed_msg = {
+                    "symbol": symbol,
+                    "event": event,
+                    "rec_time": rec_time,
+                    "data": processed_data,
+                }
+                self.litchi_md.broadcast(processed_msg)
 
     def _on_close(self, ws, code, message):
         for handler in self.handlers.values():
