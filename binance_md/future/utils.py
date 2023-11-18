@@ -25,7 +25,7 @@ class Config:
 config = Config.from_yaml(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml"))
 # print(config)
 
-logger = get_logger("logger_future_md", f"{global_config}/log.binance_future_md")
+logger = get_logger("logger_future_md", f"{global_config.log_dir}/log.binance_future_md")
 
 
 def generate_models(table_names, meta_type):
