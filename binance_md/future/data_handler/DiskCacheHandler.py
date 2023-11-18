@@ -9,7 +9,7 @@ from diskcache import Cache
 from peewee import Model
 
 from binance_md.future.data_handler.BaseHandler import BaseHandler
-from binance_md.future.utils import logger, config
+from binance_md.future.utils import logger
 from tools import global_config
 
 cache_folder = global_config.md_ws_cache

@@ -1,8 +1,8 @@
 from diskcache import Cache
 from peewee import Model
 
-from binance_md.future.utils import config
 from tools import global_config
+
 
 class BaseHandler:
     date: str

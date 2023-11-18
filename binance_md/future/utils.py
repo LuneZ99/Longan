@@ -1,7 +1,8 @@
 import os
 from dataclasses import dataclass
-from peewee import Model
+
 import yaml
+from peewee import Model
 
 from tools import get_logger, global_config
 
@@ -46,4 +47,3 @@ def generate_models(table_names, meta_type):
         model.create_table(safe=True)
 
     return models
-

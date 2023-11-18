@@ -16,7 +16,6 @@ db = MySQLDatabase(
 
 
 class BaseDepth20(Model):
-
     update_id = BigIntegerField(primary_key=True, null=False)
     prev_update_id = BigIntegerField(null=False)
     rec_time = BigIntegerField(null=False)
