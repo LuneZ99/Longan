@@ -12,6 +12,8 @@ from binance_td.utils import config, logger
 from litchi_md.client import LitchiClientSender
 from tools import global_config, get_ms
 
+websocket.enableTrace(True)
+
 
 class ListenKeyREST:
 
