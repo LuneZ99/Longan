@@ -63,17 +63,7 @@ class BaseBinanceWSClient:
 
         self.interrupt_cache = Cache(f"{global_config.cache_dir}/future_md_interrupt")
 
-        if config.push_to_litchi:
-            self.litchi_md = LitchiClientSender("future_md_ws", logger)
-            # try:
-            #     self.litchi_md = websocket.create_connection(global_config.litchi_md_url)
-            #     self.litchi_md.send(f"{MsgType.register}{RegisterType.sender}")
-            #     self.log(INFO, "litchi_md connected")
-            # except ConnectionRefusedError:
-            #     self.log(WARN, "ConnectionRefusedError, is litchi_md server running?")
-            #     self.litchi_md = None
-        else:
-            self.litchi_md = None
+        self.litchi_md = LitchiClientSender("future_md_ws", logger) if config.push_to_litchi else None
 
     def subscribe(self, symbol: str, event: str, log_interval: int = True):
 

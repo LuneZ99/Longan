@@ -23,7 +23,7 @@ class LitchiBaseStrategy:
         self.running = False
 
     def _on_open(self, ws):
-        ws.broadcast(f"{MsgType.register}{RegisterType.receiver}")
+        ws.send(f"{MsgType.register}{RegisterType.receiver}")
         self.scheduled_task_running = True
         thread = threading.Thread(target=self._scheduled_task)
         thread.start()
@@ -51,17 +51,17 @@ class LitchiBaseStrategy:
         else:
             self.on_message(**msg)
 
-    def _on_depth20(self, symbol, event, data, rec_time):
-        self.on_depth20(symbol, event, data, rec_time)
+    def _on_depth20(self, symbol, event, data, rec_time, sender):
+        self.on_depth20(symbol, event, data, rec_time, sender)
 
-    def _on_agg_trade(self, symbol, event, data, rec_time):
-        self.on_agg_trade(symbol, event, data, rec_time)
+    def _on_agg_trade(self, symbol, event, data, rec_time, sender):
+        self.on_agg_trade(symbol, event, data, rec_time, sender)
 
-    def _on_kline(self, symbol, event, data, rec_time):
-        self.on_kline(symbol, event, data, rec_time)
+    def _on_kline(self, symbol, event, data, rec_time, sender):
+        self.on_kline(symbol, event, data, rec_time, sender)
 
-    def _on_order_trade(self, symbol, event, data, rec_time):
-        self.on_order_trade(symbol, event, data, rec_time)
+    def _on_order_trade(self, symbol, event, data, rec_time, sender):
+        self.on_order_trade(symbol, event, data, rec_time, sender)
 
     def _scheduled_task(self):
         while self.scheduled_task_running:
@@ -84,20 +84,20 @@ class LitchiBaseStrategy:
     def scheduled_task(self):
         raise NotImplementedError
 
-    def on_message(self, symbol, event, data, rec_time):
+    def on_message(self, symbol, event, data, rec_time, sender):
         raise NotImplementedError
 
-    def on_agg_trade(self, symbol, event, data, rec_time):
+    def on_agg_trade(self, symbol, event, data, rec_time, sender):
         raise NotImplementedError
 
-    def on_kline(self, symbol, event, data, rec_time):
+    def on_kline(self, symbol, event, data, rec_time, sender):
         raise NotImplementedError
 
-    def on_book_ticker(self, symbol, event, data, rec_time):
+    def on_book_ticker(self, symbol, event, data, rec_time, sender):
         raise NotImplementedError
 
-    def on_depth20(self, symbol, event, data, rec_time):
+    def on_depth20(self, symbol, event, data, rec_time, sender):
         raise NotImplementedError
 
-    def on_order_trade(self, symbol, event, data, rec_time):
+    def on_order_trade(self, symbol, event, data, rec_time, sender):
         raise NotImplementedError

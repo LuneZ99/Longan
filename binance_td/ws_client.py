@@ -10,7 +10,7 @@ from httpx import Response
 
 from binance_td.utils import config, logger
 from litchi_md.client import LitchiClientSender
-from tools import global_config, MsgType, RegisterType, get_ms
+from tools import global_config, get_ms
 
 
 class ListenKeyREST:
@@ -81,31 +81,24 @@ class BinanceTDWSClient:
         self.subscribe_url = f"wss://fstream.binance.com/ws/{self.listen_key}"
         logger.info(f"Subscribe to {self.subscribe_url}")
 
-        self.litchi_client = LitchiClientSender("binance_td_ws", logger=logger)
-        self.litchi_client.send_str(f"{MsgType.register}{RegisterType.sender}")
-
-        if config.push_to_litchi:
-            try:
-                self.litchi_md = websocket.create_connection(config.litchi_md_url)
-                self.litchi_md.send(f"{MsgType.register}{RegisterType.sender}")
-                logger.info("litchi_md connected")
-            except ConnectionRefusedError:
-                logger.warning("ConnectionRefusedError, is litchi_md server running?")
-                self.litchi_md = None
-        else:
-            self.litchi_md = None
+        self.litchi_client = LitchiClientSender("future_td_ws", logger=logger)
 
     def __del__(self):
         self.listen_key_server.delete_listen_key()
+        self.litchi_client.close()
 
     def update_listen_key(self):
         while True:
-            resp_code = self.listen_key_server.put_listen_key()
-            if resp_code == 200:
-                logger.info("Update listen key successfully.")
-                time.sleep(60 * 10)
-            else:
-                logger.warning("Update listen key failed.")
+            try:
+                resp_code = self.listen_key_server.put_listen_key()
+                if resp_code == 200:
+                    logger.info("Update listen key successfully.")
+                    time.sleep(60 * 10)
+                else:
+                    logger.warning("Update listen key failed.")
+                    time.sleep(60)
+            except httpx.ConnectTimeout as e:
+                logger.warning(f"Update listen key failed. {e}")
                 time.sleep(60)
 
     def run(self):
@@ -156,5 +149,5 @@ class BinanceTDWSClient:
 
 
 if __name__ == '__main__':
-    tws = BinanceTDWSClient(config.proxy_url)
+    tws = BinanceTDWSClient(global_config.proxy_url)
     tws.run()
