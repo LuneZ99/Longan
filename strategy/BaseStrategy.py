@@ -48,6 +48,8 @@ class LitchiBaseStrategy:
             self._on_depth20(**msg)
         elif event == 'ORDER_TRADE_UPDATE':
             self._on_order_trade(**msg)
+        elif event == 'ACCOUNT_UPDATE':
+            self._on_account_update(**msg)
         else:
             self.on_message(**msg)
 
@@ -62,6 +64,9 @@ class LitchiBaseStrategy:
 
     def _on_order_trade(self, symbol, event, data, rec_time, sender):
         self.on_order_trade(symbol, event, data, rec_time, sender)
+
+    def _on_account_update(self, symbol, event, data, rec_time, sender):
+        self.on_account_update(symbol, event, data, rec_time, sender)
 
     def _scheduled_task(self):
         while self.scheduled_task_running:
@@ -100,4 +105,7 @@ class LitchiBaseStrategy:
         raise NotImplementedError
 
     def on_order_trade(self, symbol, event, data, rec_time, sender):
+        raise NotImplementedError
+
+    def on_account_update(self, symbol, event, data, rec_time, sender):
         raise NotImplementedError

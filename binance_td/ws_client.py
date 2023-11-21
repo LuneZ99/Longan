@@ -1,6 +1,8 @@
 import hashlib
 import hmac
 import json
+import random
+import signal
 import threading
 import time
 
@@ -12,7 +14,7 @@ from binance_td.utils import config, logger
 from litchi_md.client import LitchiClientSender
 from tools import global_config, get_ms
 
-websocket.enableTrace(True)
+# websocket.enableTrace(True)
 
 
 class ListenKeyREST:
@@ -63,6 +65,8 @@ class ListenKeyREST:
 
 class BinanceTDWSClient:
     ws: websocket.WebSocketApp
+    running = False
+    scheduled_task_running = False
 
     def __init__(self, proxy):
 
@@ -90,7 +94,7 @@ class BinanceTDWSClient:
         self.litchi_client.close()
 
     def update_listen_key(self):
-        while True:
+        while self.scheduled_task_running:
             try:
                 resp_code = self.listen_key_server.put_listen_key()
                 if resp_code == 200:
@@ -103,6 +107,25 @@ class BinanceTDWSClient:
                 logger.warning(f"Update listen key failed. {e}")
                 time.sleep(60)
 
+    def _fetch_account_update(self):
+        self.last_account_update_id = get_ms()
+        data = {
+            "method": "REQUEST",
+            "params":
+                [
+                    f"{self.listen_key}@account",
+                    f"{self.listen_key}@balance",
+                    f"{self.listen_key}@position"
+                ],
+            "id": self.last_account_update_id
+        }
+        self.ws.send(json.dumps(data))
+
+    def fetch_account_update(self):
+        while self.scheduled_task_running:
+            self._fetch_account_update()
+            time.sleep(random.randint(55, 65))
+
     def run(self):
 
         self.ws = websocket.WebSocketApp(
@@ -111,40 +134,59 @@ class BinanceTDWSClient:
             on_open=self._on_open,
             on_close=self._on_close,
         )
-
+        self.running = True
         proxy = self.proxy[0]
         logger.info(f"Using proxy: {proxy}")
-        self.ws.run_forever(
-            http_proxy_host=proxy[1],
-            http_proxy_port=proxy[2],
-            proxy_type=proxy[0],
-            skip_utf8_validation=True
-        )
+
+        while self.running:
+            self.ws.run_forever(
+                http_proxy_host=proxy[1],
+                http_proxy_port=proxy[2],
+                proxy_type=proxy[0],
+                skip_utf8_validation=True
+            )
 
     def _on_open(self, ws):
-        thread = threading.Thread(target=self.update_listen_key)
-        thread.start()
+        self.scheduled_task_running = True
+        threads = [
+            threading.Thread(target=self.update_listen_key),
+            threading.Thread(target=self.fetch_account_update)
+        ]
+        for thread in threads:
+            thread.start()
+        # self._fetch_account_update()
 
     def _on_message(self, ws, message):
+
+        if not self.running:
+            self.scheduled_task_running = False
+            self.ws.close()
+            return
 
         message = json.loads(message)
         logger.info(message)
         rec_time = get_ms()
-        event = message['e']
 
         # OT_UPDATE
-        if event == "ORDER_TRADE_UPDATE":
+        if message['e'] == "ORDER_TRADE_UPDATE":
+            event = message['e']
             symbol = message['o']['s']
             message['o']['E'] = message['E']
-        else:
-            return
-        processed_msg = {
-            "symbol": symbol,
-            "event": event,
-            "rec_time": rec_time,
-            "data": message['o'],
-        }
-        self.litchi_client.broadcast(processed_msg)
+            processed_msg = {
+                "symbol": symbol,
+                "event": event,
+                "rec_time": rec_time,
+                "data": message['o'],
+            }
+            self.litchi_client.broadcast(processed_msg)
+        elif message['e'] == "ACCOUNT_UPDATE":
+            processed_msg = {}
+            self.litchi_client.broadcast(processed_msg)
+        elif message['id'] == self.last_account_update_id:
+            # todo 消息拆分
+            self.litchi_client.broadcast(message)
+
+
 
     def _on_close(self, ws, code, message):
         pass
@@ -152,4 +194,12 @@ class BinanceTDWSClient:
 
 if __name__ == '__main__':
     tws = BinanceTDWSClient(global_config.proxy_url)
+
+    def keyboard_interrupt_handler(signal, frame):
+        print("Keyboard interrupt received. Stopping...")
+        global tws
+        tws.running = False
+
+    signal.signal(signal.SIGINT, keyboard_interrupt_handler)
+
     tws.run()

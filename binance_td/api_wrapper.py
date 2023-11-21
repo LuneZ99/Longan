@@ -408,8 +408,45 @@ class BinanceFutureTradingAPIUtils:
 
         return resp
 
-    def send_market_order_v1(self):
-        pass
+    def send_market_order_v1(
+            self,
+            symbol,
+            quantity,
+            order_side,
+            client_order_id,
+            local_order_id='auto',
+            testnet=False,
+    ):
+        url = "/fapi/v1/order/test" if testnet else "/fapi/v1/order"
+
+        if local_order_id == 'auto':
+            local_order_id = self.last_order_id = self.last_order_id + 1
+
+        params = dict(
+            symbol=symbol,
+            side=order_side,
+            type=OrderType.MARKET,
+            quantity=quantity,
+            newClientOrderId=client_order_id,
+        )
+
+        resp = self.post(url, params, auth=True)
+
+        if 'updateTime' in resp:
+            resp['code'] = 0
+        else:
+            resp['updateTime'] = get_ms()
+            resp['status'] = OrderStatus.REJECTED
+
+        self.order_cache[local_order_id] = dict(
+            order_status=resp['status'],
+            update_time=resp['updateTime'],
+            resp_code=resp['code'],
+            params=params,
+            response=resp
+        )
+
+        return resp
 
     def send_batch_limit_order_v1(self):
         raise NotImplementedError
