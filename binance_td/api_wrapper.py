@@ -523,15 +523,14 @@ if __name__ == '__main__':
     # s.get_balance()
     # print(s.symbol_info['ETHUSDT'])
     # print(s.symbol_all)
-    # s.send_limit_order_v1(
-    #     symbol='ETHUSDT',
-    #     price=1000.00,
-    #     quantity=0.01,
-    #     order_side=OrderSide.BUY,
-    #     time_in_force=TimeInForce.GTC,
-    #     prefix='test',
-    #     # testnet=True
-    # )
+    FT.send_limit_order_v1(
+        symbol='ethusdt',
+        price=1500.00,
+        quantity=10,
+        order_side=OrderSide.BUY,
+        client_order_id='test1',
+        time_in_force=TimeInForce.GTC
+    )
     # time.sleep(10)
     # s.delete_order_v1(
     #     delete_last_order=True

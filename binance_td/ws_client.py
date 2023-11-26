@@ -168,7 +168,7 @@ class BinanceTDWSClient:
             self.ws.close()
             return
 
-        logger.info(message)
+        logger.info(message[:128])
         message = json.loads(message)
         rec_time = get_ms()
 

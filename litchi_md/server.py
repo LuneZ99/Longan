@@ -8,7 +8,7 @@ from tools import *
 # import json
 
 
-config = DotDict.from_yaml("config.yaml")
+# config = DotDict.from_yaml("config.yaml")
 
 # if config.litchi_md_log:
 #     logger_litchi_md = logging.getLogger('logger_litchi_md')
@@ -43,7 +43,7 @@ async def broadcast_handle(websocket: websockets.WebSocketServerProtocol):
                 # If the message is from a sender, broadcast it to all receivers.
                 if len(receivers) > 0:
                     data = msg[1:]
-                    tasks = [ws.broadcast(data) for ws in receivers if ws != websocket]
+                    tasks = [ws.send(data) for ws in receivers if ws != websocket]
                     results = await asyncio.gather(*tasks, return_exceptions=True)
                     for ws, result in zip(receivers, results):
                         if isinstance(result, Exception):
@@ -52,10 +52,10 @@ async def broadcast_handle(websocket: websockets.WebSocketServerProtocol):
                 data = msg[1:]
                 if data == RegisterType.sender:
                     senders.add(websocket)
-                    print(f"add sender")
+                    print(f"add sender {data}")
                 elif data == RegisterType.receiver:
                     receivers.add(websocket)
-                    print(f"add receiver")
+                    print(f"add receiver {data}")
                 else:
                     pass
             else:
@@ -71,9 +71,11 @@ async def broadcast_handle(websocket: websockets.WebSocketServerProtocol):
 
 md_server = websockets.serve(
     broadcast_handle,
-    config.litchi_md_ip,
-    config.litchi_md_port,
+    # config.litchi_md_ip,
+    # config.litchi_md_port,
     # logger=logger_litchi_md,
+    "localhost",
+    8010,
     ping_interval=None,
     ping_timeout=None,
     close_timeout=None,
