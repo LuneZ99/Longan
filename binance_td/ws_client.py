@@ -9,6 +9,7 @@ import time
 import httpx
 import websocket
 from httpx import Response
+from diskcache import Cache
 
 from binance_td.utils import config, logger
 from litchi_md.client import LitchiClientSender
@@ -88,6 +89,10 @@ class BinanceTDWSClient:
         logger.info(f"Subscribe to {self.subscribe_url}")
 
         self.litchi_client = LitchiClientSender("future_td_ws", logger=logger)
+        self.balance = Cache(f'{global_config.disk_cache_dir}/balance')
+        self.position = Cache(f'{global_config.disk_cache_dir}/position')
+        self.account_update = Cache(f'{global_config.disk_cache_dir}/account_update')
+        self.order_trade_update = Cache(f'{global_config.disk_cache_dir}/account_update')
 
     def __del__(self):
         self.listen_key_server.delete_listen_key()
@@ -124,7 +129,7 @@ class BinanceTDWSClient:
     def fetch_account_update(self):
         while self.scheduled_task_running:
             self._fetch_account_update()
-            time.sleep(random.randint(55, 65))
+            time.sleep(10)
 
     def run(self):
 
@@ -163,30 +168,37 @@ class BinanceTDWSClient:
             self.ws.close()
             return
 
-        message = json.loads(message)
         logger.info(message)
+        message = json.loads(message)
         rec_time = get_ms()
 
         # OT_UPDATE
-        if message['e'] == "ORDER_TRADE_UPDATE":
-            event = message['e']
-            symbol = message['o']['s']
-            message['o']['E'] = message['E']
-            processed_msg = {
-                "symbol": symbol,
-                "event": event,
-                "rec_time": rec_time,
-                "data": message['o'],
-            }
-            self.litchi_client.broadcast(processed_msg)
-        elif message['e'] == "ACCOUNT_UPDATE":
-            processed_msg = {}
-            self.litchi_client.broadcast(processed_msg)
-        elif message['id'] == self.last_account_update_id:
-            # todo 消息拆分
-            self.litchi_client.broadcast(message)
+        if 'e' in message.keys():
+            if message['e'] == "ORDER_TRADE_UPDATE":
+                event = message['e']
+                symbol = message['o']['s']
+                message['o']['E'] = message['E']
+                processed_msg = {
+                    "symbol": symbol,
+                    "event": event,
+                    "rec_time": rec_time,
+                    "data": message['o'],
+                }
+                self.litchi_client.broadcast(processed_msg)
+                self.order_trade_update[message['o']['c']] = message
+            elif message['e'] == "ACCOUNT_UPDATE":
+                self.account_update[f"{message['a']['m']}_{message['E']}"] = message
+                # todo save all account_update
+        elif 'id' in message.keys() and message['id'] == self.last_account_update_id:
+            for res in message['result']:
+                if 'balance' in res['req']:
+                    for val in res['res']['balances']:
+                        self.balance[val['asset']] = val
+                elif 'position' in res['req']:
+                    for val in res['res']['positions']:
+                        self.position[val['symbol']] = val
 
-
+            pass
 
     def _on_close(self, ws, code, message):
         pass
