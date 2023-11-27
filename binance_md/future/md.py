@@ -78,7 +78,7 @@ def binance_md_ws_worker(
         ws_trace=ws_trace
     )
 
-    _interrupt_cache = Cache(f"{global_config.cache_dir}/future_md_interrupt")
+    _interrupt_cache = Cache(f"{global_config.future_flag_dir}/future_md_interrupt")
 
     for _symbol in symbols_all:
         for event in subscribe_list:
@@ -93,7 +93,7 @@ def binance_md_ws_worker(
             break
 
 
-interrupt_cache = Cache(f"{global_config.cache_dir}/future_md_interrupt")
+interrupt_cache = Cache(f"{global_config.future_flag_dir}/future_md_interrupt")
 interrupt_cache.clear()
 interrupt_cache['flag'] = False
 

@@ -1,19 +1,19 @@
 import hashlib
 import hmac
 import json
-import random
 import signal
 import threading
 import time
 
 import httpx
 import websocket
-from httpx import Response
 from diskcache import Cache
+from httpx import Response
 
-from binance_td.utils import config, logger
+from binance_td.future.utils import config, logger
 from litchi_md.client import LitchiClientSender
 from tools import global_config, get_ms
+
 
 # websocket.enableTrace(True)
 
@@ -21,7 +21,6 @@ from tools import global_config, get_ms
 class ListenKeyREST:
 
     def __init__(self):
-
         self.url = 'https://fapi.binance.com/fapi/v1/listenKey'
 
         self.client = httpx.Client(proxies=global_config.proxies)
@@ -50,12 +49,9 @@ class ListenKeyREST:
         return self.listen_key
 
     def delete_listen_key(self):
-        try:
-            data = dict(timestamp=int(time.time() * 1000))
-            data['signature'] = self.generate_signature(data)
-            self.client.delete(self.url, params=data, headers=self.headers)
-        except Exception as e:
-            pass
+        data = dict(timestamp=int(time.time() * 1000))
+        data['signature'] = self.generate_signature(data)
+        self.client.delete(self.url, params=data, headers=self.headers)
 
     def put_listen_key(self):
         data = dict(timestamp=int(time.time() * 1000))
@@ -89,10 +85,10 @@ class BinanceTDWSClient:
         logger.info(f"Subscribe to {self.subscribe_url}")
 
         self.litchi_client = LitchiClientSender("future_td_ws", logger=logger)
-        self.balance = Cache(f'{global_config.disk_cache_dir}/balance')
-        self.position = Cache(f'{global_config.disk_cache_dir}/position')
-        self.account_update = Cache(f'{global_config.disk_cache_dir}/account_update')
-        self.order_trade_update = Cache(f'{global_config.disk_cache_dir}/account_update')
+        self.balance = Cache(f'{global_config.future_disk_cache_dir}/balance')
+        self.position = Cache(f'{global_config.future_disk_cache_dir}/position')
+        self.account_update = Cache(f'{global_config.future_disk_cache_dir}/account_update')
+        self.order_trade_update = Cache(f'{global_config.future_disk_cache_dir}/order_trade_update')
 
     def __del__(self):
         self.listen_key_server.delete_listen_key()
@@ -207,10 +203,12 @@ class BinanceTDWSClient:
 if __name__ == '__main__':
     tws = BinanceTDWSClient(global_config.proxy_url)
 
+
     def keyboard_interrupt_handler(signal, frame):
         print("Keyboard interrupt received. Stopping...")
         global tws
         tws.running = False
+
 
     signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 

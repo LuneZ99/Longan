@@ -3,12 +3,10 @@ import hmac
 
 import backoff
 import httpx
-from diskcache import Cache
 from httpx import Response
 
+from binance_td.future.utils import config
 from tools import *
-
-from binance_td.utils import config
 
 
 class BinanceFutureTradingAPIUtils:
@@ -24,16 +22,12 @@ class BinanceFutureTradingAPIUtils:
         self.headers = {
             "X-MBX-APIKEY": self.api_key
         }
-        self.logger = get_logger("binance_future_td", f"{global_config.log_dir}/log.binance_future_td")
+        self.logger = get_logger("future_td")
 
         # self.api_cache = Cache(config.api_cache_dir)
-        self.order_cache = Cache(f"{global_config.local_order_cache}")
+        self.order_cache = Cache(f"{global_config.future_local_order_cache}")
         self.last_order_id = max(self.order_cache.iterkeys(), default=1_000_000)
         self.init_exchange_info()
-
-        self.request_weight_1m = 0
-        self.orders_1m = 0
-        self.orders_10s = 0
 
     def __del__(self):
         pass
@@ -58,6 +52,10 @@ class BinanceFutureTradingAPIUtils:
 
     @backoff.on_exception(backoff.expo, httpx.ConnectTimeout, max_tries=5)
     def get(self, url, params=None, auth=False) -> dict:
+
+        if rate_limit.is_limited():
+            time.sleep(10)
+
         if params is None:
             params = dict()
 
@@ -72,21 +70,21 @@ class BinanceFutureTradingAPIUtils:
             response: Response = self.client.get(url, params=params)
 
         resp = response.json()
-        head = response.headers
-        self.request_weight_1m = int(head['x-mbx-used-weight-1m'])
+        rate_limit.update(response.headers)
 
         if response.status_code == 200:
-            # self.api_cache[cache_key] = resp
-            # read rate limit from header
             text = f"GET request successful. url: {url}, param: {params}, resp: {resp}."[:512]
             self.logger.info(text)
-            # print(head)
             return resp
         else:
-            # self.api_cache[cache_key] = None
-            self.logger.error(f"GET Request failed with status code: {response.status_code}. url: {url}, param: {params}.")
+            self.logger.error(
+                f"GET Request failed with status code: {response.status_code}. url: {url}, param: {params}.")
 
     def post(self, url, data=None, recv_window=None, auth=False):
+
+        if rate_limit.is_limited():
+            global_logger.critical(f"API access rate exceeds limit when sending order.")
+            time.sleep(5)
 
         url = self.base_url + url
         timestamp = int(time.time() * 1000)
@@ -95,7 +93,7 @@ class BinanceFutureTradingAPIUtils:
             data = dict()
 
         if recv_window is None:
-            data['recvWindow'] = 5000
+            data['recvWindow'] = 3000
 
         if auth:
             data['timestamp'] = timestamp
@@ -105,11 +103,11 @@ class BinanceFutureTradingAPIUtils:
             response: Response = self.client.post(url, data=data)
 
         resp = response.json()
-        head = response.headers
+        rate_limit.update(response.headers)
 
         if response.status_code == 200:
             self.logger.info(
-                f"POST request successful. url: {url}, data: {data}, resp: {resp}, resp_header: {head}."
+                f"POST request successful. url: {url}, data: {data}, resp: {resp}, resp_header: {response.headers}."
             )
         else:
             self.logger.error(
@@ -118,14 +116,13 @@ class BinanceFutureTradingAPIUtils:
                 f" url: {url}, data: {data}, resp: {resp}."
             )
 
-        # read rate limit from header
-        self.request_weight_1m = int(head['x-mbx-used-weight-1m'])
-        self.orders_1m = int(head['x-mbx-order-count-10s'])
-        self.orders_10s = int(head['x-mbx-order-count-1m'])
-
         return resp
 
     def delete(self, url, data=None, recv_window=None, auth=False):
+
+        if rate_limit.is_limited():
+            global_logger.critical(f"API access rate exceeds limit when deleting order.")
+            time.sleep(5)
 
         url = self.base_url + url
         timestamp = int(time.time() * 1000)
@@ -144,11 +141,11 @@ class BinanceFutureTradingAPIUtils:
             response: Response = self.client.delete(url, params=data)
 
         resp = response.json()
-        head = response.headers
+        rate_limit.update(response.headers)
 
         if response.status_code == 200:
             self.logger.info(
-                f"DELETE request successful. url: {url}, data: {data}, resp: {resp}, resp_header: {head}."
+                f"DELETE request successful. url: {url}, data: {data}, resp: {resp}, resp_header: {response.headers}."
             )
         else:
             self.logger.error(
@@ -159,14 +156,14 @@ class BinanceFutureTradingAPIUtils:
 
         return resp
 
-    def check_orders_rate_limit(self):
-        # orders_1m : 1200
-        # orders_10s: 300
-        # request_weight_1m: 2400
-        if self.orders_1m > 1000 or self.orders_10s > 250 or self.request_weight_1m > 2000:
-            self.logger.warning(f"Insert order too quickly, {self.orders_1m} / 10s, {self.orders_10s} / 1m")
-            return True
-        return False
+    # def check_orders_rate_limit(self):
+    #     # orders_1m : 1200
+    #     # orders_10s: 300
+    #     # request_weight_1m: 2400
+    #     if self.orders_1m > 1000 or self.orders_10s > 250 or self.request_weight_1m > 2000:
+    #         self.logger.warning(f"Insert order too quickly, {self.orders_1m} / 10s, {self.orders_10s} / 1m")
+    #         return True
+    #     return False
 
     def check_delay(self, retry_times=3):
         delay_ls = [- (self.get_server_time()["serverTime"] - get_ms()) for _ in range(retry_times)]
@@ -373,8 +370,6 @@ class BinanceFutureTradingAPIUtils:
             local_order_id='auto',
             testnet=False,
     ):
-        if self.check_orders_rate_limit():
-            return -1
 
         url = "/fapi/v1/order/test" if testnet else "/fapi/v1/order"
 
@@ -526,7 +521,7 @@ if __name__ == '__main__':
     FT.send_limit_order_v1(
         symbol='ethusdt',
         price=1500.00,
-        quantity=10,
+        quantity=6,
         order_side=OrderSide.BUY,
         client_order_id='test1',
         time_in_force=TimeInForce.GTC
@@ -535,5 +530,3 @@ if __name__ == '__main__':
     # s.delete_order_v1(
     #     delete_last_order=True
     # )
-
-

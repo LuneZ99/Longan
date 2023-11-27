@@ -4,7 +4,6 @@ from logging import INFO, ERROR, WARN
 from typing import Callable
 
 import websocket
-from diskcache import Cache
 
 from binance_md.future.utils import config, logger
 from litchi_md.client import LitchiClientSender
@@ -61,7 +60,7 @@ class BaseBinanceWSClient:
         self.delay_warning_interval = 60
         self.delay_warning_count = 0
 
-        self.interrupt_cache = Cache(f"{global_config.cache_dir}/future_md_interrupt")
+        self.interrupt_cache = Cache(f"{global_config.future_flag_dir}/future_md_interrupt")
 
         self.litchi_md = LitchiClientSender("future_md_ws", logger) if config.push_to_litchi else None
 

@@ -6,7 +6,7 @@ from diskcache import Cache
 from httpx import Response, ConnectTimeout
 
 from binance_md.future.utils import config, logger
-from tools import global_config, get_ms, get_timestamp_list_hour, split_list_by_length
+from tools import global_config, get_ms, get_timestamp_list_hour, split_list_by_length, rate_limit
 
 
 class BinanceMarketDataAPIUtils:
@@ -18,11 +18,9 @@ class BinanceMarketDataAPIUtils:
         self.base_url = 'https://fapi.binance.com'
 
         self.client = httpx.Client(proxies=global_config.proxies)
-        self.api_cache = Cache(config.api_cache_dir)
-        self.request_weight_limit = 2000  # binance limit 2400
-        self.request_weight_cache = Cache(f'{global_config.cache_dir}/binance_request_weight')
+        self.weight_limit = Cache(f'{global_config.future_flag_dir}/weight_limit')
         self.kline_expire = 32 * 24 * 60 * 60
-        self.md_ws_cache_dir = global_config.md_ws_cache
+        self.md_ws_cache_dir = global_config.future_md_ws_cache
         self.num_workers = config.num_threads
         self.executor = ThreadPoolExecutor(max_workers=self.num_workers)
 
@@ -31,56 +29,38 @@ class BinanceMarketDataAPIUtils:
     def __del__(self):
         self.client.close()
 
-    def get_request_weight_limit(self):
-        return sum(self.request_weight_cache.get(k, 0) for k in self.request_weight_cache.iterkeys())
+    def get(self, url, params=None, retry_times=0) -> dict:
 
-    def check_rate_limit(self):
-        if self.request_weight_cache.get('api_limit') is not None:
-            return False
-        if self.get_request_weight_limit() > self.request_weight_limit:
-            return False
-        return True
-
-    def get(self, url, params=None, use_cache=False, retry_times=0) -> dict:
+        if rate_limit.is_limited():
+            time.sleep(10)
 
         if params is None:
             params = dict()
 
         url = self.base_url + url
-        timestamp = int(time.time() * 1000)
-        cache_key = f"GET_{url}_{params}_{timestamp}"
 
-        if use_cache:
-            resp = self.api_cache.get(cache_key, None)
-            if resp is not None:
-                logger.info(f"Use cache key: {cache_key}")
-                return resp
         try:
             response: Response = self.client.get(url, params=params)
+            rate_limit.update(response.headers)
         except ConnectTimeout:
             logger.error(f"GET Request failed with ConnectTimeout. url: {url}, param: {params}, retrying...")
             if retry_times < 5:
-                return self.get(url, params=params, use_cache=use_cache, retry_times=retry_times + 1)
+                return self.get(url, params=params, retry_times=retry_times + 1)
             else:
                 return {}
 
         if response.status_code == 200:
             resp = response.json()
-            self.api_cache[cache_key] = resp
             # read rate limit from header
             text = f"GET request successful. " \
-                   f"limit: {self.get_request_weight_limit()}, url: {url}, param: {params}, resp: {resp}."
-            if len(text) > 512:
-                text = text[:512]
-            logger.info(text)
+                   f"url: {url}, param: {params}, resp: {resp}."
+            logger.info(text[:512])
             return resp
-        elif response.status_code == 429:
-            self.api_cache[cache_key] = None
-            logger.error(f"GET Request failed with status code: {response.status_code}. url: {url}, param: {params}.")
-            logger.error(f"RATE LIMIT 429 !!!")
-            self.request_weight_cache.set('api_limit', 0, expire=60)
+        # elif response.status_code == 429:
+        #     logger.error(f"GET Request failed with status code: {response.status_code}. url: {url}, param: {params}.")
+        #     logger.error(f"RATE LIMIT 429 !!!")
+        #     self.request_weight_cache.set('api_limit', 0, expire=60)
         else:
-            self.api_cache[cache_key] = None
             logger.error(f"GET Request failed with status code: {response.status_code}. url: {url}, param: {params}.")
 
     def get_server_time(self):
@@ -88,25 +68,23 @@ class BinanceMarketDataAPIUtils:
         API 获取服务器时间
         :return: "serverTime": 1499827319559
         """
-        self.request_weight_cache.push(1, expire=60)
         return self.get("/fapi/v1/time")
 
     def check_delay(self, retry_times=3):
         delay_ls = [- (self.get_server_time()["serverTime"] - get_ms()) for _ in range(retry_times)]
         return sum(delay_ls) / len(delay_ls), max(delay_ls)
 
-    def get_exchange_info(self, use_cache=False):
+    def get_exchange_info(self):
         """
         API 获取交易规则和交易对
         """
-        self.request_weight_cache.push(1, expire=60)
-        return self.get("/fapi/v1/exchangeInfo", use_cache=use_cache)
+        return self.get("/fapi/v1/exchangeInfo")
 
     def init_exchange_info(self):
         """
         初始化交易对信息
         """
-        exchange_info = self.get_exchange_info(use_cache=False)
+        exchange_info = self.get_exchange_info()
 
         for symbol_dic in exchange_info['symbols']:
             if symbol_dic['contractType'] == 'PERPETUAL':
@@ -128,8 +106,6 @@ class BinanceMarketDataAPIUtils:
         :param symbol:
         :return:
         """
-        self.request_weight_cache.push(1, expire=60)
-
         return self.get(
             "/fapi/v1/premiumIndex",
             params=dict(
@@ -143,22 +119,13 @@ class BinanceMarketDataAPIUtils:
 
         :param symbol:
         :param interval:
-        :param startTime:
-        :param endTime:
+        :param start_time:
+        :param end_time:
         :param limit:
         :return:
         """
         if limit is None:
             raise NotImplementedError("limit must be set")
-
-        if limit < 100:
-            self.request_weight_cache.push(1, expire=60)
-        elif limit < 500:
-            self.request_weight_cache.push(2, expire=60)
-        elif limit <= 1000:
-            self.request_weight_cache.push(5, expire=60)
-        else:
-            self.request_weight_cache.push(10, expire=60)
 
         return self.get(
             "/fapi/v1/klines",

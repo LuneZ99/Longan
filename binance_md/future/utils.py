@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import yaml
 from peewee import Model
 
-from tools import get_logger, global_config
+from tools import get_logger
 
 
 @dataclass
@@ -24,9 +24,8 @@ class Config:
 
 
 config = Config.from_yaml(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml"))
-# print(config)
 
-logger = get_logger("logger_future_md", f"{global_config.log_dir}/log.binance_future_md")
+logger = get_logger("future_md_ws")
 
 
 def generate_models(table_names, meta_type):

@@ -12,8 +12,7 @@ class LitchiBaseStrategy:
     def __init__(self, logger=None, scheduled_task_interval=0.1, litchi_url="ws://localhost:8010"):
 
         self.logger = logger or get_logger(
-            "litchi_base_strategy",
-            "/dev/shm/longan_cache/logs/log.litchi_base_strategy"
+            "BaseStrategy"
         )
         self.litchi_url = litchi_url
 

@@ -12,7 +12,7 @@ from binance_md.future.data_handler.BaseHandler import BaseHandler
 from binance_md.future.utils import logger
 from tools import global_config
 
-cache_folder = global_config.md_ws_cache
+cache_folder = global_config.future_md_ws_cache
 
 
 class BaseStreamDiskCacheHandler(BaseHandler):
@@ -100,8 +100,8 @@ class BaseStreamDiskCacheMysqlHandler(BaseHandler):
         if len(self.cache_list) > 0:
             logger.log(
                 INFO,
-                f"Flush {self.symbol:>13}@{self.event:<9} [{len(self.cache_list):>5}] to sql | "
-                f"avg delay {self.avg_delay:>4.0f} ms | "
+                f"Received {self.symbol:>13}@{self.event:<9} {self.rec_count:>10}[+{len(self.cache_list):>6}], "
+                f"avg delay {self.avg_delay:>4.0f} ms, "
                 f"last delay {self.last_delay:>4.0f} ms"
             )
             self.model.insert_many(self.cache_list).execute()

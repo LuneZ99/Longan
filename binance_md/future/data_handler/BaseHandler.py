@@ -10,7 +10,7 @@ class BaseHandler:
     event: str
 
     def __init__(self):
-        self.interrupt_cache = Cache(f"{global_config.cache_dir}/binance_md_interrupt")
+        self.interrupt_cache = Cache(f"{global_config.future_cache_dir}/binance_md_interrupt")
         self.interrupt_cache[f"{self.symbol}@{self.event}"] = False
 
     def on_close(self):
