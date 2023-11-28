@@ -118,6 +118,44 @@ class BinanceFutureTradingAPIUtils:
 
         return resp
 
+    def put(self, url, data=None, recv_window=None, auth=False):
+
+        if rate_limit.is_limited():
+            global_logger.critical(f"API access rate exceeds limit when sending order.")
+            time.sleep(5)
+
+        url = self.base_url + url
+        timestamp = int(time.time() * 1000)
+
+        if data is None:
+            data = dict()
+
+        if recv_window is None:
+            data['recvWindow'] = 3000
+
+        if auth:
+            data['timestamp'] = timestamp
+            data['signature'] = self.generate_signature(data)
+            response: Response = self.client.put(url, data=data, headers=self.headers)
+        else:
+            response: Response = self.client.put(url, data=data)
+
+        resp = response.json()
+        rate_limit.update(response.headers)
+
+        if response.status_code == 200:
+            self.logger.info(
+                f"PUT request successful. url: {url}, data: {data}, resp: {resp}, resp_header: {response.headers}."
+            )
+        else:
+            self.logger.error(
+                f"PUT Request failed with status code: {response.status_code}, "
+                f"binance code: {resp['code']} - {resp['msg']} with "
+                f" url: {url}, data: {data}, resp: {resp}."
+            )
+
+        return resp
+
     def delete(self, url, data=None, recv_window=None, auth=False):
 
         if rate_limit.is_limited():
@@ -155,15 +193,6 @@ class BinanceFutureTradingAPIUtils:
             )
 
         return resp
-
-    # def check_orders_rate_limit(self):
-    #     # orders_1m : 1200
-    #     # orders_10s: 300
-    #     # request_weight_1m: 2400
-    #     if self.orders_1m > 1000 or self.orders_10s > 250 or self.request_weight_1m > 2000:
-    #         self.logger.warning(f"Insert order too quickly, {self.orders_1m} / 10s, {self.orders_10s} / 1m")
-    #         return True
-    #     return False
 
     def check_delay(self, retry_times=3):
         delay_ls = [- (self.get_server_time()["serverTime"] - get_ms()) for _ in range(retry_times)]
@@ -445,6 +474,46 @@ class BinanceFutureTradingAPIUtils:
 
     def send_batch_limit_order_v1(self):
         raise NotImplementedError
+
+    def put_order_v1(
+            self,
+            symbol,
+            price,
+            quantity,
+            order_side,
+            client_order_id,
+            local_order_id='auto'
+    ):
+        url = "/fapi/v1/order"
+
+        if local_order_id == 'auto':
+            local_order_id = self.last_order_id = self.last_order_id + 1
+
+        params = dict(
+            symbol=symbol,
+            side=order_side,
+            price=price,
+            quantity=quantity,
+            origClientOrderId=client_order_id,
+        )
+
+        resp = self.put(url, params, auth=True)
+
+        if 'updateTime' in resp:
+            resp['code'] = 0
+        else:
+            resp['updateTime'] = get_ms()
+            resp['status'] = OrderStatus.REJECTED
+
+        self.order_cache[local_order_id] = dict(
+            order_status=resp['status'],
+            update_time=resp['updateTime'],
+            resp_code=resp['code'],
+            params=params,
+            response=resp
+        )
+
+        return resp
 
     def delete_order_v1(self, symbol, client_order_id):
 

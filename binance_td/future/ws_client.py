@@ -184,8 +184,8 @@ class BinanceTDWSClient:
                 self.order_trade_update[message['o']['c']] = message
             elif message['e'] == "ACCOUNT_UPDATE":
                 self.account_update[f"{message['a']['m']}_{message['E']}"] = message
-                # todo save all account_update
         elif 'id' in message.keys() and message['id'] == self.last_account_update_id:
+            # print(message)
             for res in message['result']:
                 if 'balance' in res['req']:
                     for val in res['res']['balances']:
@@ -193,8 +193,6 @@ class BinanceTDWSClient:
                 elif 'position' in res['req']:
                     for val in res['res']['positions']:
                         self.position[val['symbol']] = val
-
-            pass
 
     def _on_close(self, ws, code, message):
         pass
