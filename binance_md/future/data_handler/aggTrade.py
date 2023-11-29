@@ -3,6 +3,7 @@ from typing import Any
 from peewee import *
 
 from binance_md.future.data_handler.DiskCacheHandler import BaseStreamDiskCacheMysqlHandler
+from binance_md.future.data_handler.utils import future_symbols
 from binance_md.future.utils import config, generate_models
 
 # 设置 MySQL 数据库连接
@@ -33,7 +34,7 @@ class BaseAggTrade(Model):
         )
 
 
-models_agg_trades = generate_models(config.future_symbols, BaseAggTrade)
+models_agg_trades = generate_models(future_symbols, BaseAggTrade)
 
 
 class AggTradeHandler(BaseStreamDiskCacheMysqlHandler):

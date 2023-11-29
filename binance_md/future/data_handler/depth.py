@@ -3,6 +3,7 @@ from typing import Any
 from peewee import *
 
 from binance_md.future.data_handler.DiskCacheHandler import BaseStreamDiskCacheMysqlHandler
+from binance_md.future.data_handler.utils import future_symbols
 from binance_md.future.utils import config, generate_models
 
 # 设置 MySQL 数据库连接
@@ -113,7 +114,7 @@ class BaseDepth20(Model):
         )
 
 
-models_depth = generate_models(config.future_symbols, BaseDepth20)
+models_depth = generate_models(future_symbols, BaseDepth20)
 cols_bp = [f"bp{i}" for i in range(1, 21)]
 cols_bv = [f"bv{i}" for i in range(1, 21)]
 cols_sp = [f"sp{i}" for i in range(1, 21)]

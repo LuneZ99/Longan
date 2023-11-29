@@ -11,7 +11,7 @@ from tools import get_logger
 class Config:
     num_threads: int
     mysql: dict
-    future_symbols: list[str]
+    # future_symbols: list[str]
     kline_list: list[str]
     subscribe_events: list[str]
     event_push_to_litchi_md: list[str]

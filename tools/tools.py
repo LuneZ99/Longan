@@ -33,7 +33,7 @@ class GlobalConfig:
 global_config = GlobalConfig.from_yaml(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml"))
 
 
-def get_logger(name, logger_dir=global_config.log_dir, level=logging.INFO) -> logging.Logger:
+def get_logger(name, logger_dir=global_config.log_dir, log_console=True, level=logging.INFO) -> logging.Logger:
 
     logger = logging.getLogger(name)
     logger.setLevel(level)
@@ -49,9 +49,10 @@ def get_logger(name, logger_dir=global_config.log_dir, level=logging.INFO) -> lo
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    if log_console:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
     return logger
 

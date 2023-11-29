@@ -106,11 +106,11 @@ def signal_handler(signum, frame):
 
 signal.signal(signal.SIGINT, signal_handler)
 
-split_num = len(config.future_symbols) * len(
+split_num = len(future_symbols) * len(
     config.subscribe_events) // 100 + 1 if config.num_threads == 0 else config.num_threads
-logger.log(INFO, f"Starting with {len(config.future_symbols)} symbols, split to {split_num} MD workers.")
+logger.log(INFO, f"Starting with {len(future_symbols)} symbols, split to {split_num} MD workers.")
 
-for i, _symbols in enumerate(split_list_averagely(config.future_symbols, split_num)):
+for i, _symbols in enumerate(split_list_averagely(future_symbols, split_num)):
     p = multiprocessing.Process(
         target=binance_md_ws_worker, args=(i, _symbols, config.subscribe_events, 0, global_config.proxy_url, False)
     )

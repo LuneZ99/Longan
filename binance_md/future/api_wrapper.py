@@ -214,6 +214,7 @@ if __name__ == '__main__':
 
     FT = BinanceMarketDataAPIUtils()
     FT.get_server_time()
+    print(FT.symbol_all)
     # s.get_all_history_order()
     # s.get_balance()
     # print(s.symbol_info['ETHUSDT'])
