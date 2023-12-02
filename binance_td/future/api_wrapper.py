@@ -579,15 +579,15 @@ class BinanceFutureTradingAPIUtils:
 if __name__ == '__main__':
     import time
 
-    FT = BinanceFutureTradingAPIUtils()
-    FT.get_server_time()
-    print(FT.symbol_all)
+    stg = BinanceFutureTradingAPIUtils()
+    stg.get_server_time()
+    print(stg.symbol_all)
     # print(FT.symbol_info['ETHUSDT'])
     # s.get_all_history_order()
     # s.get_balance()
     # print(s.symbol_info['ETHUSDT'])
     # print(s.symbol_all)
-    FT.send_limit_order_v1(
+    stg.send_limit_order_v1(
         symbol='ethusdt',
         price=1500.00,
         quantity=6,

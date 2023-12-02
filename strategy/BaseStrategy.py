@@ -28,7 +28,7 @@ class LitchiBaseStrategy:
         thread.start()
 
     def _on_close(self, ws, p1, p2):
-        pass
+        self.on_close()
 
     def _on_message(self, ws, msg):
         msg = json.loads(msg)
@@ -84,6 +84,9 @@ class LitchiBaseStrategy:
 
     def stop(self):
         pass
+
+    def on_close(self):
+        raise NotImplementedError
 
     def scheduled_task(self):
         raise NotImplementedError

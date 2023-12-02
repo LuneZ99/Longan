@@ -26,6 +26,25 @@ class BinanceMarketDataAPIUtils:
 
         self.init_exchange_info()
 
+    def init_exchange_info(self):
+        """
+        初始化交易对信息
+        """
+        exchange_info = self.get_exchange_info()
+
+        for symbol_dic in exchange_info['symbols']:
+            if symbol_dic['contractType'] == 'PERPETUAL' and symbol_dic['status'] == 'TRADING':
+                self.symbol_info[symbol_dic['symbol'].lower()] = symbol_dic
+                self.symbol_all.append(symbol_dic['symbol'].lower())
+
+        delay_avg, delay_max = self.check_delay()
+
+        logger.info(
+            f"Init exchange info success, "
+            f"total {len(self.symbol_all)} symbols, from {self.symbol_all[0]} to {self.symbol_all[-1]}, "
+            f"avg delay {delay_avg:.2f} ms, max delay {delay_max:.2f} ms"
+        )
+
     def __del__(self):
         self.client.close()
 
@@ -51,7 +70,6 @@ class BinanceMarketDataAPIUtils:
 
         if response.status_code == 200:
             resp = response.json()
-            # read rate limit from header
             text = f"GET request successful. " \
                    f"url: {url}, param: {params}, resp: {resp}."
             logger.info(text[:512])
@@ -79,25 +97,6 @@ class BinanceMarketDataAPIUtils:
         API 获取交易规则和交易对
         """
         return self.get("/fapi/v1/exchangeInfo")
-
-    def init_exchange_info(self):
-        """
-        初始化交易对信息
-        """
-        exchange_info = self.get_exchange_info()
-
-        for symbol_dic in exchange_info['symbols']:
-            if symbol_dic['contractType'] == 'PERPETUAL':
-                self.symbol_info[symbol_dic['symbol']] = symbol_dic
-                self.symbol_all.append(symbol_dic['symbol'])
-
-        delay_avg, delay_max = self.check_delay()
-
-        logger.info(
-            f"Init exchange info success, "
-            f"total {len(self.symbol_all)} symbols, from {self.symbol_all[0]} to {self.symbol_all[-1]}, "
-            f"avg delay {delay_avg:.2f} ms, max delay {delay_max:.2f} ms"
-        )
 
     def get_premium_index(self, symbol):
         """
@@ -212,9 +211,9 @@ class BinanceMarketDataAPIUtils:
 if __name__ == '__main__':
     import time
 
-    FT = BinanceMarketDataAPIUtils()
-    FT.get_server_time()
-    print(FT.symbol_all)
+    stg = BinanceMarketDataAPIUtils()
+    stg.get_server_time()
+    print(stg.symbol_all)
     # s.get_all_history_order()
     # s.get_balance()
     # print(s.symbol_info['ETHUSDT'])
