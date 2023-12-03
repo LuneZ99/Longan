@@ -19,6 +19,8 @@ class LitchiBaseStrategy:
         self.scheduled_task_running = False
         self.scheduled_task_interval = scheduled_task_interval
 
+        self.heartbeat_count = 0
+
         self.running = False
 
     def _on_open(self, ws):
@@ -39,7 +41,9 @@ class LitchiBaseStrategy:
             self.ws.close()
             return
 
-        if event == 'aggTrade':
+        if event == 'heartbeat':
+            self._on_heartbeat(**msg)
+        elif event == 'aggTrade':
             self._on_agg_trade(**msg)
         elif 'kline' in event and msg['data'][-1]:
             self._on_kline(**msg)
@@ -51,6 +55,10 @@ class LitchiBaseStrategy:
             self._on_account_update(**msg)
         else:
             self.on_message(**msg)
+
+    def _on_heartbeat(self, event, data, rec_time, sender):
+        self.heartbeat_count += 1
+        self.on_heartbeat(event, data, rec_time, sender)
 
     def _on_depth20(self, symbol, event, data, rec_time, sender):
         self.on_depth20(symbol, event, data, rec_time, sender)
@@ -92,6 +100,9 @@ class LitchiBaseStrategy:
         raise NotImplementedError
 
     def on_message(self, symbol, event, data, rec_time, sender):
+        raise NotImplementedError
+
+    def on_heartbeat(self, event, data, rec_time, sender):
         raise NotImplementedError
 
     def on_agg_trade(self, symbol, event, data, rec_time, sender):
