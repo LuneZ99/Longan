@@ -9,15 +9,15 @@ class LitchiBaseStrategy:
     thread_main: threading.Thread
     ws: websocket.WebSocketApp
 
-    def __init__(self, logger=None, scheduled_task_interval=0.1, litchi_url="ws://localhost:8010"):
+    def __init__(self, logger=None, litchi_url="ws://localhost:8010"):
 
         self.logger = logger or get_logger(
             "BaseStrategy"
         )
         self.litchi_url = litchi_url
 
-        self.scheduled_task_running = False
-        self.scheduled_task_interval = scheduled_task_interval
+        # self.scheduled_task_running = False
+        # self.scheduled_task_interval = scheduled_task_interval
 
         self.heartbeat_count = 0
 
@@ -25,9 +25,9 @@ class LitchiBaseStrategy:
 
     def _on_open(self, ws):
         ws.send(f"{MsgType.register}{RegisterType.receiver}")
-        self.scheduled_task_running = True
-        thread = threading.Thread(target=self._scheduled_task)
-        thread.start()
+        # self.scheduled_task_running = True
+        # thread = threading.Thread(target=self._scheduled_task)
+        # thread.start()
 
     def _on_close(self, ws, p1, p2):
         self.on_close()
@@ -75,10 +75,10 @@ class LitchiBaseStrategy:
     def _on_account_update(self, symbol, event, data, rec_time, sender):
         self.on_account_update(symbol, event, data, rec_time, sender)
 
-    def _scheduled_task(self):
-        while self.scheduled_task_running:
-            self.scheduled_task()
-            time.sleep(self.scheduled_task_interval)
+    # def _scheduled_task(self):
+    #     while self.scheduled_task_running:
+    #         self.scheduled_task()
+    #         time.sleep(self.scheduled_task_interval)
 
     def run(self):
         self.ws = websocket.WebSocketApp(
@@ -96,8 +96,8 @@ class LitchiBaseStrategy:
     def on_close(self):
         raise NotImplementedError
 
-    def scheduled_task(self):
-        raise NotImplementedError
+    # def scheduled_task(self):
+    #     raise NotImplementedError
 
     def on_message(self, symbol, event, data, rec_time, sender):
         raise NotImplementedError
