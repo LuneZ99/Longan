@@ -14,5 +14,5 @@ while True:
         },
         'rec_time': time.time(),
     })
-    time.sleep(0.01)
+    time.sleep(0.05)
 

@@ -93,40 +93,42 @@ def binance_md_ws_worker(
             break
 
 
-interrupt_cache = Cache(f"{global_config.future_flag_dir}/future_md_interrupt")
-interrupt_cache.clear()
-interrupt_cache['flag'] = False
+if __name__ == '__main__':
+
+    interrupt_cache = Cache(f"{global_config.future_flag_dir}/future_md_interrupt")
+    interrupt_cache.clear()
+    interrupt_cache['flag'] = False
 
 
-def signal_handler(signum, frame):
-    global interrupt_cache
-    logger.log(WARNING, "Send interrupt_cache signal, closing all workers.")
-    interrupt_cache['flag'] = True
+    def signal_handler(signum, frame):
+        global interrupt_cache
+        logger.log(WARNING, "Send interrupt_cache signal, closing all workers.")
+        interrupt_cache['flag'] = True
 
 
-signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
 
-split_num = len(future_symbols) * len(
-    config.subscribe_events) // 100 + 1 if config.num_threads == 0 else config.num_threads
-logger.log(INFO, f"Starting with {len(future_symbols)} symbols, split to {split_num} MD workers.")
+    split_num = len(future_symbols) * len(
+        config.subscribe_events) // 100 + 1 if config.num_threads == 0 else config.num_threads
+    logger.log(INFO, f"Starting with {len(future_symbols)} symbols, split to {split_num} MD workers.")
 
-for i, _symbols in enumerate(split_list_averagely(future_symbols, split_num)):
-    p = multiprocessing.Process(
-        target=binance_md_ws_worker, args=(i, _symbols, config.subscribe_events, 0, global_config.proxy_url, False)
-    )
-    p.daemon = True
-    p.start()
-
-while not interrupt_cache['flag']:
-    time.sleep(1)
-else:
-    while not all(interrupt_cache[k] for k in interrupt_cache.iterkeys()):
-        logger.log(
-            INFO,
-            f"Waiting for remain "
-            f"{[k for k in interrupt_cache.iterkeys() if interrupt_cache[k] is False]} "
-            f"workers closing... "
+    for i, _symbols in enumerate(split_list_averagely(future_symbols, split_num)):
+        p = multiprocessing.Process(
+            target=binance_md_ws_worker, args=(i, _symbols, config.subscribe_events, 0, global_config.proxy_url, False)
         )
+        p.daemon = True
+        p.start()
+
+    while not interrupt_cache['flag']:
         time.sleep(1)
     else:
-        logger.log(INFO, f"All workers closed.")
+        while not all(interrupt_cache[k] for k in interrupt_cache.iterkeys()):
+            logger.log(
+                INFO,
+                f"Waiting for remain "
+                f"{[k for k in interrupt_cache.iterkeys() if interrupt_cache[k] is False]} "
+                f"workers closing... "
+            )
+            time.sleep(1)
+        else:
+            logger.log(INFO, f"All workers closed.")

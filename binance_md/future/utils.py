@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import yaml
 from peewee import Model
 
-from tools import get_logger
+from tools import get_logger, get_config
 
 
 @dataclass
@@ -22,8 +22,14 @@ class Config:
         with open(file_path, 'r') as file:
             return cls(**yaml.safe_load(file))
 
+    @classmethod
+    def from_nacos(cls):
+        return cls(**get_config("binance_md.future", "longan"))
 
-config = Config.from_yaml(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml"))
+
+# config = Config.from_yaml(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml"))
+
+config = Config.from_nacos()
 
 logger = get_logger("future_md_ws")
 
@@ -46,3 +52,7 @@ def generate_models(table_names, meta_type):
         model.create_table(safe=True)
 
     return models
+
+
+if __name__ == '__main__':
+    print(config)

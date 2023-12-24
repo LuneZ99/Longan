@@ -1,11 +1,23 @@
-from dataclasses import dataclass
-import os
-from pathlib import Path
 import logging
-import yaml
+import os
+from dataclasses import dataclass
 from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 
+# disable line 45 in nacos/client.py
+import nacos
+import yaml
 from diskcache import Cache
+
+
+def get_config(
+        data_id,
+        group,
+        server_addresses="http://i.tech.corgi.plus:8848",
+        namespace="43ac8393-f291-4438-83c2-1dc1b499a58e"
+):
+    client = nacos.NacosClient(server_addresses, namespace=namespace)
+    return yaml.safe_load(client.get_config(data_id, group))
 
 
 @dataclass
@@ -29,12 +41,16 @@ class GlobalConfig:
         with open(file_path, 'r') as file:
             return cls(**yaml.safe_load(file))
 
+    @classmethod
+    def from_nacos(cls):
+        return cls(**get_config("global", "longan"))
 
-global_config = GlobalConfig.from_yaml(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml"))
+
+# global_config = GlobalConfig.from_yaml(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml"))
+global_config = GlobalConfig.from_nacos()
 
 
 def get_logger(name, logger_dir=global_config.log_dir, log_console=True, level=logging.INFO) -> logging.Logger:
-
     logger = logging.getLogger(name)
     logger.setLevel(level)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s | %(message)s')
@@ -91,3 +107,16 @@ class RateLimit:
 
 rate_limit = RateLimit()
 
+if __name__ == '__main__':
+    # cfg = get_config("global", "longan")
+    # print(cfg)
+    # print(type(cfg))
+    import sys
+
+    print(global_config)
+    print(list(sys.path))
+    for path in sys.path:
+        if 'nacos' in path:
+            print(f"nacos in {path}")
+
+    pass
